@@ -3,6 +3,6 @@ body {
   margin: 0;
   padding: 0;
   background-color: #605E5E;
-  color: #FFF; /* Dark gray text for good readability */
-  line-height: 1.6; /* Improves readability of text */
+  color: #FFF;
+  line-height: 1.6;
 }
