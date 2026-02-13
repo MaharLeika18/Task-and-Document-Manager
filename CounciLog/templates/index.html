@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Page</title>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logos">
+            <img src="ccs_logo" alt="">
+            <img src="perps_logo" alt="">
+            <img src="aura404_logo" alt="">
+        </div>
+        <div class="search-bar">
+            <img src="search_icon" alt="">
+            <form action="the link to the search endpoint">
+                <input type="text" placeholder="Search People, Projects or Tasks">
+                <button type="submit"><i class="fa fa-search"></i></button>
+            </form>
+        </div>
+
+        <div class="utilities">
+            <a href="" class="notification-button"></a>
+            <a href="" class="mail-button"></a>
+            <a href="" class="profile-button"></a>
+        </div>
+    </nav>
+
+    <div class="side-bar">
+        <ul class="buttons">
+            <li class="home"><a href="" id="home"></a></li>
+            <li class="projects"><a href="" id="projects"></a></li>
+            <li class="members"><a href="" id="members"></a></li>
+            <li class="calendar"><a href="" id="calendar"></a></li>
+            <li class="files"><a href="" id="files"></a></li>
+        </ul>
+
+        <div class="dailies">
+            <div class="add-dailies"></div>
+            <h1>Dailies</h1>
+            <a href="" id="add-dailies"><i class="fa fa-add"></i></a>
+            <ul class="dailies">
+                {# backend or js logic where we can add and pull some daily tasks here as a div #}
+            </ul>
+        </div>
+
+        <div class="logout">
+            <a href="logout"><i class="fa fa-add"></i>Logout</a>
+        </div>
+    </div>
+</body>
+</html>
