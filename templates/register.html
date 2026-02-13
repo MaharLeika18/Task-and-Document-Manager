@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    
+    <form id="registration-form" action="#" method="post">
+        <div id="forms">
+            <span>
+                <h1>Create Account</h1>
+            </span>
+            <div id="input1-reg">
+                <div id="userdata">
+                    <h2>First Name</h2>
+                    <input type="text" id="first-name" name="first-name" placeholder="Enter your first name" required>
+                </div>
+
+                <div id="userdata">
+                    <h2>Last Name</h2>
+                    <input type="text" id="last-name" name="last-name" placeholder="Enter your last name" required>
+                </div>
+
+                <div id="userdata">
+                    <h2>Username</h2>
+                    <input type="text" id="username" name="username" placeholder="Choose a username" required>
+                </div>
+            </div>
+
+            <div id="input2-reg">
+                <div id="userdata">
+                    <h2>Email</h2>
+                    <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                </div>
+
+                <div id="password">
+                    <h2>Password</h2>
+                    <input type="password" id="password1" name="password1" placeholder="Create a password" required>
+                </div>
+
+                <div id="password-confirmation">
+                    <h2>Re-enter Password</h2>
+                    <input type="password" id="password2" name="password2" placeholder="Confirm your password" required>
+                </div>
+            </div>
+        </div>
+
+        <div id="form-buttons">
+            <button type="submit" id="email-reg">
+                <span class="material-symbols-outlined">person_add</span>
+                Create Account
+            </button>
+            <div id="buttons-reg">
+                <button type="button" id="google-reg">
+                    Sign-up using Google
+                </button>
+            </div>
+        </div>
+        <a href="/login.html">Already have an account? Log in</a>
+    </form>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+    <script src="{{ url_for('static', filename='js/register.js') }}"></script>
+</body>
+</html>
