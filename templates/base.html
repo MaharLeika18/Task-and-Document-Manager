@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Home{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logos">
+            <img src="{{ url_for('static', filename='images/ccs_logo.png') }}" alt="CCS">
+            <img src="{{ url_for('static', filename='images/perps_logo.png') }}" alt="Perps">
+            <img src="{{ url_for('static', filename='images/aura404_logo.png') }}" alt="Aura404">
+        </div>
+
+        <div class="search-bar">
+            <form action="{{ url_for('search') }}" method="GET">
+                <input type="text" name="q" placeholder="Search People, Projects or Tasks">
+                <button type="submit">
+                    <i class="fa fa-search"></i>
+                </button>
+            </form>
+        </div>
+
+        <div class="utilities">
+            {# 
+                will prolly add js logic here to display the things in the notifications and messages instead of linking to a separate page
+            #}
+            <a href="{{ url_for('notifications') }}" class="notification-button"></a>
+            <a href="{{ url_for('messages') }}" class="mail-button"></a>
+            <a href="{{ url_for('profile') }}" class="profile-button"></a>
+        </div>
+    </nav>
+
+    <div class="side-bar">
+        <ul class="buttons">
+            <li><a href="{{ url_for('home') }}" id="home">Home</a></li>
+            <li><a href="{{ url_for('projects') }}" id="projects">Projects</a></li>
+            <li><a href="{{ url_for('members') }}" id="members">Members</a></li>
+            <li><a href="{{ url_for('calendar') }}" id="calendar">Calendar</a></li>
+            <li><a href="{{ url_for('files') }}" id="files">Files</a></li>
+        </ul>
+
+        <div class="dailies">
+            <div class="add-dailies"></div>
+            <h1>Dailies</h1>
+            <a href="{{ url_for('add_daily') }}" id="add-dailies"> 
+                {# 
+                    will prolly add js logic here instead of the add_daily url
+                    to open a screen to add a daily without leaving the page
+                    will go back to it later
+                #}
+                <i class="fa fa-add"></i>
+            </a>
+            
+
+
+            <ul class="dailies">
+                {% for daily in dailies %}
+                    <li>
+                        <div class="daily-item">
+                            <h2>{{ daily.title }}</h2>
+                            <p>{{ daily.description }}</p>
+                        </div>
+                    </li>
+                {% else %}
+                    <li class="empty">No dailies yet</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="logout">
+            <a href="{{ url_for('logout') }}">
+                <i class="fa fa-sign-out"></i> Logout
+            </a>
+        </div>
+    </div>
+
+    {# MAIN CONTENT AREA #}
+    <main class="content">
+        {% block content %}
+        {# Page-specific content goes here #}
+        {% endblock %}
+    </main>
+
+    {# Javascript file #}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

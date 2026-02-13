@@ -1,12 +1,10 @@
+import os
 from flask import Flask, url_for, Blueprint, render_template, request, session, redirect
 
-app = Flask(__name__)
+from app import create_app
 
-@app.route('/')
-def index():
-    return
-
-#insert more routes here
+app = create_app()
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY")
 
 if __name__ == "__main__":
     app.run(debug=True)
