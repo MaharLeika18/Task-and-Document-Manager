@@ -1,0 +1,36 @@
+{# the base for the register and login page #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Home{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="" />
+
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap" rel="stylesheet">
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="logos">
+        <img src="{{ url_for('static', filename='images/ccs_logo.png') }}" alt="CCS">
+        <img src="{{ url_for('static', filename='images/perps_logo.png') }}" alt="Perps">
+        <img src="{{ url_for('static', filename='images/aura404_logo.png') }}" alt="Aura404">
+    </div>
+
+    {# MAIN CONTENT AREA #}
+    <main class="content">
+        {% block content %}
+        {# Page-specific content goes here #}
+        {% endblock %}
+    </main>
+    
+    {# Only include page-specific scripts in child templates #}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
