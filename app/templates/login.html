@@ -1,0 +1,44 @@
+{% extends "base_register.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+    <div class="auth-container">
+        <form id="login-form" action="#" method="post">
+            <div id="forms">
+                <span>
+                    <h1>Log-in your Account</h1>
+                </span>
+                <div id="input2-reg">
+                    <div id="coral-email">
+                        <h2>Email</h2>
+                        <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                    </div>
+
+                    <div id="coral-password">
+                        <h2>Password</h2>
+                        <input type="password" id="password1" name="password" placeholder="Enter your password" required>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="form-buttons">
+                <div class="g-recaptcha" data-sitekey="6LfDIkMrAAAAACeq9D-GS5wK7EaS5P0UEtH-yB96"></div>
+                <button type="submit" id="email-reg">
+                    <span class="material-symbols-outlined">login</span>
+                    Login
+                </button>
+                <div id="buttons-reg">
+                    <button type="button" id="google-reg">
+                        Log-in using Google
+                    </button>
+                </div>
+            </div>
+            <a href="/">Don't have an account? Sign up</a>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script type="module" src="{{ url_for('static', filename='js/login.js') }}"></script>
+{% endblock %}
