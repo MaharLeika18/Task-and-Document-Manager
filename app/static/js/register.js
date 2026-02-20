@@ -64,7 +64,7 @@ email_reg.addEventListener('submit', async (e) => {
         });
         
         const data = await res.json();
-
+        console.log(data)
         if (data.success) {
             await addData(register_data);
             alert("Registration successful!");

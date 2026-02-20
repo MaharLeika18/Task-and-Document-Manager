@@ -43,7 +43,7 @@ login_form.addEventListener('submit', async (e) => {
         });
 
         const data = await res.json();
-
+        console.log(data)
         if (data.success) {
             alert("Log-in successful!");
             window.location.href = "/home";
@@ -73,7 +73,7 @@ google_reg.addEventListener("click", async (e) => {
         });
 
         const data = await res.json();
-
+        console.log(data)
         if (data.success) {
             alert("Log-in successful!");
             window.location.href = "/home";
