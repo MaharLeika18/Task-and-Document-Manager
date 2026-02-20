@@ -2,6 +2,7 @@
 import os
 from flask import Flask, url_for,jsonify, g, Blueprint, render_template, request, session, redirect
 from .firebase_run import verify_firebase_token
+from functools import wraps
 # In your __init__.py
 from flask import Flask
 from flask_cors import CORS
@@ -9,6 +10,8 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)  
 app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY")
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # Import the blueprint from views.py and register it
 
 def create_app():
@@ -39,6 +42,7 @@ def index():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
 
 # @app.before_request
 # def require_auth():
