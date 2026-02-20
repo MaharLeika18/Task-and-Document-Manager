@@ -66,7 +66,7 @@ google_reg.addEventListener("click", async (e) => {
         const user = result.user;
         const token = await user.getIdToken();
 
-        const res = await fetch("/login/login", {
+        const res = await fetch("/login/login_user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token })

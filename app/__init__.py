@@ -41,17 +41,18 @@ def index():
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for('login.index'))
 
-
-# @app.before_request
-# def require_auth():
-#     if request.path in PUBLIC_ROUTES:
-#         return
-
-#     decoded_token = verify_firebase_token()
-#     if not decoded_token:
-#         return jsonify({"error": "Unauthorized"}), 401
-
-#     g.user = decoded_token
-#     print("User authenticated:", g.user)
+# yung nakuhang session data sa register.py or login.py 
+# dito ko na lang nilagay sa isang func where will turn it into a dict man HAAHAHAHA
+def session_data():
+    if "uid" not in session:
+        return redirect("/login")
+    
+    return {
+        "uid": session["uid"],
+        "email": session["email"],
+        "name": session["name"],
+        "picture": session["picture"],
+        "current_session_id": session["current_session_id"]
+    }
