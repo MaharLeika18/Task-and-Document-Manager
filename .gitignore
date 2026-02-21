@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .venv
 firebase-admin.json
+councilog-960a406ec1c5.json

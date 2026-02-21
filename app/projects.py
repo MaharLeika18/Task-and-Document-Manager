@@ -11,5 +11,4 @@ projects_bp = Blueprint('projects', __name__, url_prefix='/')
 @auth_required
 def projects():
     user_data = session_data()
-    
     return render_template("projects.html", user=user_data)
