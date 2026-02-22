@@ -21,6 +21,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    {% set user = session_data() %}
     <nav class="navbar">
         <div class="logos">
             <img src="{{ url_for('static', filename='images/ccs_logo.png') }}" alt="CCS">
@@ -50,7 +51,7 @@
             #}
             <a href="#" class="notification-button"></a>
             <a href="#" class="mail-button"></a>
-            <a href="#" class="profile-button"></a>
+            <a href="#" class="profile-button"><img src="{{ session_data().get('picture') }}" alt=""></a>
 
             {#Ginawa ko munang comment hehe nageerror e di ko pa nalalagay yung routes goisHAAHAHAHAHA#}
             {# Maybe will use some frontend fetch na lang to put some notifications, mails and the profiles instead 

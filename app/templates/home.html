@@ -3,11 +3,6 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
+{% set user = session_data() %}
 <h1>Welcome, {{ user.name }}</h1>
-
-<div class="dashboard-cards">
-    <div class="card">Projects</div>
-    <div class="card">Tasks</div>
-    <div class="card">Members</div>
-</div>
 {% endblock %}

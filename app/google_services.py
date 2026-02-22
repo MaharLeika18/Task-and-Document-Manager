@@ -1,11 +1,15 @@
+from random import random
+from flask import jsonify
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.oauth2 import service_account
+from datetime import datetime, timedelta
 import os
 import dotenv
+from app.session_id_generation import generate_secure_string
 from firebase_run import db, auth, verify_firebase_token
 dotenv.load_dotenv()
 
@@ -19,10 +23,12 @@ def gcalendar_service():
     service = build('calendar', 'v3', credentials=creds)
     return service
 
-def create_project(project_maker, project_name, project_description, assigned_members, 
+def create_project_firestore(project_maker, project_name, project_description, assigned_members, 
                     tasks, priority, category, calendar_link, start_date, end_date):
     project = db.collection('projects').add({
-        'project_maker': project_maker,
+        'project_uid': generate_secure_string(32),
+        'project_maker': project_maker['name'],
+        'project_maker_uid': project_maker['uid'],
         'project_name': project_name,
         'project_description': project_description,
         'assigned_members': assigned_members,
@@ -30,11 +36,16 @@ def create_project(project_maker, project_name, project_description, assigned_me
         'priority': priority,
         'category': category,
         'calendar_link': calendar_link,
-        'start_date': start_date,
+        'start_date': datetime.now().strptime(start_date, '%Y-%m-%d').isoformat(),
         'end_date': end_date
     })
+    
+    return jsonify({
+        'success': True,
+        'project_id': project[1].id
+    })
 
-def create_project(project_name, project_description, start_time, end_time):
+def create_project_gcalendar(project_name, project_description, start_time, end_time):
     service = gcalendar_service()
     event = {
         'summary': project_name,
@@ -53,3 +64,5 @@ def create_project(project_name, project_description, start_time, end_time):
         print('Event created: %s' % (event.get('htmlLink')))
     except HttpError as error:
         print('An error occurred: %s' % error)
+        
+    return event.get('htmlLink')

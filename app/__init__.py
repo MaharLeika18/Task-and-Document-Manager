@@ -14,6 +14,24 @@ app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # Import the blueprint from views.py and register it
 
+# yung nakuhang session data sa register.py or login.py 
+# dito ko na lang nilagay sa isang func where will turn it into a dict man HAAHAHAHA
+@app.context_processor
+def inject_session_data():
+    def session_data():
+        if "uid" not in session:
+            return redirect("/login")
+        
+        return {
+            "uid": session["uid"],
+            "email": session["email"],
+            "name": session["name"],
+            "picture": session["picture"],
+            "current_session_id": session["current_session_id"]
+        }
+    return dict(session_data=session_data)
+
+
 def create_app():
     from .login import login_bp
     from .home import home_bp
@@ -43,16 +61,3 @@ def logout():
     session.clear()
     return redirect(url_for('login.index'))
 
-# yung nakuhang session data sa register.py or login.py 
-# dito ko na lang nilagay sa isang func where will turn it into a dict man HAAHAHAHA
-def session_data():
-    if "uid" not in session:
-        return redirect("/login")
-    
-    return {
-        "uid": session["uid"],
-        "email": session["email"],
-        "name": session["name"],
-        "picture": session["picture"],
-        "current_session_id": session["current_session_id"]
-    }
