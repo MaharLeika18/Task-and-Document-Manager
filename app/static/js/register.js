@@ -104,7 +104,7 @@ google_reg.addEventListener("click", async (e) => {
             display_name: user.displayName || "User",
             username: user.displayName || user.email.split('@')[0],
             email: user.email,
-            date_created: `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`
+            date_created: `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`,
         };
 
         await addData(register_data);

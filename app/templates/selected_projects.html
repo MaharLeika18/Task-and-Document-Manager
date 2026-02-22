@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Project: {% endblock %}
+
+{% block content %}
+
+<div class="dashboard-cards">
+    <div class="card">Projects</div>
+    <div class="card">Tasks</div>
+    <div class="card">Members</div>
+</div>
+
+
+
+<div class="project-dashboard">
+    <div class="details-div">
+        <div class="project-name">
+            <a href="#"><h3>BACK TO PROJECTS</h3></a>
+            <h1>Project Name</h1>
+        </div>
+        <div class="date">
+            <h3>TODAY'S DATE</h3>
+            <h1>{# today_date #}</h1>
+        </div>
+
+        {# will populate these later#}
+        <div class="project-stats">
+            <h3>PROJECT STATS</h3>
+            <p>Number of Tasks: </p>
+            <p>Number of Members:</p>
+        </div>
+        <button id="add-people">Add people</button>
+    </div>
+
+    <div class="projects-sidebar">
+        <div class="project-details">
+            <h1>Details</h1>
+            <ul>
+            {#imma flaask out the details naa lanng hehe#}
+                <li>Team: </li>
+                <li>Status: </li>
+                <li>Lead: </li>
+                <li>Assignee</li>
+            </ul>
+        </div>
+        <div class="project-dates">
+        </div>
+        <div class="project-description">
+        </div>
+        <div class="project-comments">
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

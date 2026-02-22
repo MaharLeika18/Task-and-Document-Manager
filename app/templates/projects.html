@@ -1,13 +1,113 @@
 {% extends "base.html" %}
 
-{% block title %}Home{% endblock %}
+{% block title %}Projects{% endblock %}
 
 {% block content %}
 <h1>Welcome, {{ user.name }}</h1>
+{#if nasa normal na pprojects tab lang tayo gois eto yung lalabas#}
+{#if walang selected project hehe#}
+{#prolly sa flask I'll return a project variable or something#}
+{#imma take  a look pa if pano natin gagwin hehe#}
+<div class="project-dashboard">
+    <div class="details-div">
+    {#This is the top paart below the nav dun sa figma hehe#}
+    {# this is the else if may project na selected si user#}
+        <div class="date">
+            <h3>TODAY'S DATE</h3>
+            <h1>{# today_date #}</h1>
+        </div>
 
-<div class="dashboard-cards">
-    <div class="card">Projects</div>
-    <div class="card">Tasks</div>
-    <div class="card">Members</div>
+        {# will populate these later#}
+        <div class="project-stats">
+            <h3>PROJECT STATS</h3>
+            <p>Number of Tasks: </p>
+            <p>Number of Members:</p>
+        </div>
+        <button id="create-project">Create a project</button>
+    </div>
+    {#ihide natin tong create-project div and lalabas 
+    lang tong form pag pinindot yung create_project button HAHAHAH#}
+    {# floating div na lang siguro toh gois kayo na bahala HAAHAHAHAA#}
+    <div class="create-project">
+        <form action="{{ url_for('projects.create_project') }}" method="POST">
+            <h2>Create a new project</h2>
+            <input type="text" placeholder="Project Name">
+            <textarea placeholder="Project Description"></textarea>
+            <input type="text" placeholder="Assign Members">
+            <label for="members">Choose a member/s:</label>
+            <select name="members" id="members">
+                <option value="None">None</option>
+                {% if members %}
+                    {% for member in members%}
+                        <option value="{{ member }}">{{ member }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+
+            <label for="project-status">Project Status:</label>
+            <select name="project-status" id="project-status">
+                <option value="current">Current/Approved Projects</option>
+                <option value="upcoming">Upcoming(Waiting for Approval)</option>
+            </select>
+            <label for="deadline">Deadline:</label>
+            <input name="deadline" type="date" placeholder="Deadline">
+            <button type="submit">Create</button>
+        </form>
+    </div>
+
+    {# this is the kanban style board thingy dun sa figma file#}
+    <div class="projects-main">
+        <div class="project-search">
+            <form action="#">
+                <input type="text" placeholder="Search projects...">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="projects-table-card">
+            <h2>{# project_name #}</h2>
+            <table>
+                <tr>
+                    <th>Upcoming (Waiting for Approval)</th>
+                    <th>Current Projects</th>
+                    <th>Finished</th>
+                </tr>
+                <tr>
+                    {# imma figure out the outputs na lang sa projects.py#}
+                    {# maybe the cards are links to the project tab#}
+                    {# {% for current_project in projects %}
+                        <td>
+                            <div class="project-card">
+                                <h3>{{ current_project.name }}</h3>
+                                <p>{{ current_project.description }}</p>
+                            </div>
+                        </td>
+                    {% endfor %} #}
+                </tr>
+                <tr>
+                    {# imma figure out the outputs na lang sa projects.py#}
+                    {# {% for current_project in projects %}
+                        <td>
+                            <div class="project-card">
+                                <h3>{{ current_project.name }}</h3>
+                                <p>{{ current_project.description }}</p>
+                            </div>
+                        </td>
+                    {% endfor %} #}
+                </tr>
+                <tr>
+                    {# imma figure out the outputs na lang sa projects.py#}
+                    {# {% for current_project in projects %}
+                        <td>
+                            <div class="project-card">
+                                <h3>{{ current_project.name }}</h3>
+                                <p>{{ current_project.description }}</p>
+                            </div>
+                        </td>
+                    {% endfor %} #}
+                </tr>
+            </table>
+        </div>
+    </div>
 </div>
+
 {% endblock %}
