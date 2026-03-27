@@ -116,7 +116,7 @@
                     <div class="column-header">CURRENT PROJECTS</div>
                     {% for project in projects %}
                         {% if project.status == 'current' %}
-                            <div class="project-card" onclick="openProject('{{ project.project_uid }}')">
+                            <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
                                 <p>{{ project.project_description }}</p>
                             </div>
@@ -129,7 +129,7 @@
                     <div class="column-header">UPCOMING <span>(WAITING FOR APPROVAL)</span></div>
                     {% for project in projects %}
                         {% if project.status == 'upcoming' %}
-                            <div class="project-card" onclick="openProject('{{ project.project_uid }}')">
+                            <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
                                 <p>{{ project.project_description }}</p>
                             </div>
@@ -142,7 +142,7 @@
                     <div class="column-header">FINISHED</div>
                     {% for project in projects %}
                         {% if project.status == 'finished' %}
-                            <div class="project-card" onclick="openProject('{{ project.project_uid }}')">
+                            <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
                                 <p>{{ project.project_description }}</p>
                             </div>
@@ -288,18 +288,31 @@
         month: 'long', day: 'numeric', year: 'numeric'
     });
 
-    function openProject(projectUid) {
+    function openProject(element) {
+        // Get project UID from the data attribute
+        const projectUid = element.getAttribute('data-project-uid');
         const project = PROJECTS_DATA.find(p => p.project_uid === projectUid);
-        if (!project) return;
-        console.log("Opening project:", project);
-        console.log(PROJECTS_DATA);
+        
+        if (!project) {
+            console.error("[v0] Project not found for UID:", projectUid);
+            return;
+        }
+        
+        console.log("[v0] Opening project:", project);
 
+        // Update the project name in the task view
         document.getElementById('task-view-project-name').textContent = project.project_name;
 
-        ['todo', 'in-progress', 'review', 'done'].forEach(id => {
-            document.getElementById(`tasks-${id}`).innerHTML = '';
+        // Clear all task columns
+        ['todo', 'in-progress', 'review', 'done'].forEach(status => {
+            const columnId = `tasks-${status}`;
+            const column = document.getElementById(columnId);
+            if (column) {
+                column.innerHTML = '';
+            }
         });
 
+        // Populate tasks into their respective columns
         (project.tasks || []).forEach(task => {
             const card = document.createElement('div');
             card.classList.add('task-card');
@@ -307,15 +320,22 @@
                 <p>${task.name}</p>
                 <span class="task-priority priority-${task.priority}">${task.priority}</span>
             `;
+            
             const columnMap = {
                 'todo': 'tasks-todo',
                 'in-progress': 'tasks-in-progress',
                 'review': 'tasks-review',
                 'done': 'tasks-done'
             };
-            document.getElementById(columnMap[task.status] || 'tasks-todo').appendChild(card);
+            
+            const targetColumnId = columnMap[task.status] || 'tasks-todo';
+            const targetColumn = document.getElementById(targetColumnId);
+            if (targetColumn) {
+                targetColumn.appendChild(card);
+            }
         });
 
+        // Switch views
         document.getElementById('projects-table-view').style.display = 'none';
         document.getElementById('project-task-view').style.display = 'block';
     }
