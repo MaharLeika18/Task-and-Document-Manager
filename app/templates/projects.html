@@ -28,86 +28,343 @@
     {#ihide natin tong create-project div and lalabas 
     lang tong form pag pinindot yung create_project button HAHAHAH#}
     {# floating div na lang siguro toh gois kayo na bahala HAAHAHAHAA#}
-    <div class="create-project">
+    <div class="create-project">    
+        <button type="button" id="close-create-project">✕ Cancel</button>
         <form action="{{ url_for('projects.create_project') }}" method="POST">
             <h2>Create a new project</h2>
-            <input type="text" placeholder="Project Name">
-            <textarea placeholder="Project Description"></textarea>
-            <input type="text" placeholder="Assign Members">
-            <label for="members">Choose a member/s:</label>
-            <select name="members" id="members">
-                <option value="None">None</option>
-                {% if members %}
-                    {% for member in members%}
-                        <option value="{{ member }}">{{ member }}</option>
-                    {% endfor %}
-                {% endif %}
-            </select>
+
+            <input type="text" placeholder="Project Name" name="project-name">
+            <textarea placeholder="Project Description" name="project-description"></textarea>
+            {# <input type="text" placeholder="Assign Members" name="assign-members"> #}
+
+            <label>Assign member/s:</label>
+            
+            <div>
+                <!-- Include current user -->
+                <label>
+                    <input type="checkbox" name="members" value="{{ user.uid }}" checked>
+                    {{ user.name }} (You)
+                </label>
+            </div>
+
+            {% if members %}
+                {% for member in members %}
+                    <div>
+                        <label>
+                            <input type="checkbox" name="members" value="{{ member.uid }}">
+                            {{ member.name }}
+                        </label>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="tasks-section">
+                <div class="tasks-header">
+                    <label>Tasks:</label>
+                    <button type="button" id="add-task-btn" onclick="addTask()">+ Add Task</button>
+                </div>
+
+                <div id="tasks-container">
+                    <!-- Task rows are added here dynamically -->
+                </div>
+            </div>
 
             <label for="project-status">Project Status:</label>
             <select name="project-status" id="project-status">
                 <option value="current">Current/Approved Projects</option>
-                <option value="upcoming">Upcoming(Waiting for Approval)</option>
+                <option value="upcoming">Upcoming (Waiting for Approval)</option>
             </select>
+
+            <label for="project-priority">Priority Level:</label>
+            <select name="project-priority" id="project-priority">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+
+            <label for="project-category">Category:</label>
+            <select name="project-category" id="project-category">
+                <option value="ces">Community Extension Services Project</option>
+                <option value="seminar">Seminar</option>
+                <option value="competition">Competition</option>
+                <option value="general-assembly">General Assembly</option>
+            </select>
+
             <label for="deadline">Deadline:</label>
-            <input name="deadline" type="date" placeholder="Deadline">
+            <input name="deadline" type="date">
+
             <button type="submit">Create</button>
         </form>
+        <h3>{{ error }}</h3>
     </div>
 
-    {# this is the kanban style board thingy dun sa figma file#}
     <div class="projects-main">
         <div class="project-search">
-            <form action="#">
-                <input type="text" placeholder="Search projects...">
-                <button type="submit">Search</button>
-            </form>
+            <input type="text" id="project-search-input" placeholder="Search Projects..." oninput="filterProjects()">
+            <button type="button">→</button>
+            <button type="button" id="recents-btn">⟳ Recents</button>
         </div>
-        <div class="projects-table-card">
-            <h2>{# project_name #}</h2>
-            <table>
-                <tr>
-                    <th>Upcoming (Waiting for Approval)</th>
-                    <th>Current Projects</th>
-                    <th>Finished</th>
-                </tr>
-                <tr>
-                    {# imma figure out the outputs na lang sa projects.py#}
-                    {# maybe the cards are links to the project tab#}
-                    {# {% for current_project in projects %}
-                        <td>
-                            <div class="project-card">
-                                <h3>{{ current_project.name }}</h3>
-                                <p>{{ current_project.description }}</p>
+
+        <!-- PROJECT TABLE VIEW -->
+        <div id="projects-table-view">
+            <h2>{{ current_year }} College of Computer Studies Projects</h2>
+
+            <div class="projects-columns">
+
+                <!-- CURRENT PROJECTS -->
+                <div class="project-column" id="col-current">
+                    <div class="column-header">CURRENT PROJECTS</div>
+                    {% for project in projects %}
+                        {% if project.status == 'current' %}
+                            <div class="project-card" onclick="openProject('{{ project.project_uid }}')">
+                                <h4>{{ project.project_name }}</h4>
+                                <p>{{ project.project_description }}</p>
                             </div>
-                        </td>
-                    {% endfor %} #}
-                </tr>
-                <tr>
-                    {# imma figure out the outputs na lang sa projects.py#}
-                    {# {% for current_project in projects %}
-                        <td>
-                            <div class="project-card">
-                                <h3>{{ current_project.name }}</h3>
-                                <p>{{ current_project.description }}</p>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- UPCOMING -->
+                <div class="project-column" id="col-upcoming">
+                    <div class="column-header">UPCOMING <span>(WAITING FOR APPROVAL)</span></div>
+                    {% for project in projects %}
+                        {% if project.status == 'upcoming' %}
+                            <div class="project-card" onclick="openProject('{{ project.project_uid }}')">
+                                <h4>{{ project.project_name }}</h4>
+                                <p>{{ project.project_description }}</p>
                             </div>
-                        </td>
-                    {% endfor %} #}
-                </tr>
-                <tr>
-                    {# imma figure out the outputs na lang sa projects.py#}
-                    {# {% for current_project in projects %}
-                        <td>
-                            <div class="project-card">
-                                <h3>{{ current_project.name }}</h3>
-                                <p>{{ current_project.description }}</p>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- FINISHED -->
+                <div class="project-column" id="col-finished">
+                    <div class="column-header">FINISHED</div>
+                    {% for project in projects %}
+                        {% if project.status == 'finished' %}
+                            <div class="project-card" onclick="openProject('{{ project.project_uid }}')">
+                                <h4>{{ project.project_name }}</h4>
+                                <p>{{ project.project_description }}</p>
                             </div>
-                        </td>
-                    {% endfor %} #}
-                </tr>
-            </table>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TASK VIEW (hidden until a project is clicked) -->
+        <div id="project-task-view" style="display: none;">
+
+            <div class="task-view-header">
+                <button type="button" onclick="closeProject()">← BACK TO PROJECTS</button>
+                <div>
+                    <span>TODAY'S DATE</span>
+                    <strong id="task-view-date"></strong>
+                </div>
+            </div>
+
+            <h2 id="task-view-project-name"></h2>
+
+            <div class="task-view-tabs">
+                <button type="button" class="tab-btn active" onclick="switchTab('tasks')">Tasks</button>
+                <button type="button" class="tab-btn" onclick="switchTab('backlog')">Backlog</button>
+                <button type="button" class="tab-btn" onclick="switchTab('reports')">Reports</button>
+                <button type="button" class="create-task-btn">+ Create Task</button>
+            </div>
+
+            <div id="tab-tasks">
+                <div class="task-search">
+                    <input type="text" placeholder="Search Tasks within this Project..." oninput="filterTasks()">
+                    <button type="button">My Tasks</button>
+                    <button type="button">⟳ Recents</button>
+                </div>
+
+                <div class="task-columns">
+                    <div class="task-column">
+                        <div class="column-header">TO DO</div>
+                        <div id="tasks-todo"></div>
+                    </div>
+                    <div class="task-column">
+                        <div class="column-header">IN PROGRESS</div>
+                        <div id="tasks-in-progress"></div>
+                    </div>
+                    <div class="task-column">
+                        <div class="column-header">REVIEW</div>
+                        <div id="tasks-review"></div>
+                    </div>
+                    <div class="task-column">
+                        <div class="column-header">DONE</div>
+                        <div id="tasks-done"></div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
+
+<!-- Projects data + task members data -->
+<script>
+    const CURRENT_USER = { uid: "{{ user.uid }}", name: "{{ user.name }}" };
+    const ALL_MEMBERS = [
+        {% for member in members %}
+            { uid: "{{ member.uid }}", name: "{{ member.name }}" }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const PROJECTS_DATA = {{ projects | tojson }};
+</script>
+
+<!-- Add Task logic -->
+<script>
+    let taskCount = 0;
+
+    function addTask() {
+        taskCount++;
+        const container = document.getElementById('tasks-container');
+
+        let membersHTML = `
+            <div>
+                <label>
+                    <input type="checkbox" name="tasks[${taskCount}][members]" value="${CURRENT_USER.uid}" checked>
+                    ${CURRENT_USER.name} (You)
+                </label>
+            </div>
+        `;
+
+        ALL_MEMBERS.forEach(member => {
+            membersHTML += `
+                <div>
+                    <label>
+                        <input type="checkbox" name="tasks[${taskCount}][members]" value="${member.uid}">
+                        ${member.name}
+                    </label>
+                </div>
+            `;
+        });
+
+        const taskRow = document.createElement('div');
+        taskRow.classList.add('task-row');
+        taskRow.id = `task-${taskCount}`;
+
+        taskRow.innerHTML = `
+            <span class="task-number">#${taskCount}</span>
+
+            <input type="text" name="tasks[${taskCount}][name]" placeholder="Task name" required>
+
+            <select name="tasks[${taskCount}][priority]">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+
+            <select name="tasks[${taskCount}][status]">
+                <option value="todo">To Do</option>
+                <option value="in-progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+            </select>
+
+            <label>Assign member/s:</label>
+            ${membersHTML}
+
+            <button type="button" class="remove-task-btn" onclick="removeTask(${taskCount})">✕ Remove</button>
+        `;
+
+        container.appendChild(taskRow);
+    }
+
+    function removeTask(id) {
+        const task = document.getElementById(`task-${id}`);
+        if (task) task.remove();
+        taskCount--;
+    }
+</script>
+
+<!-- Project table + task view logic -->
+<script>
+    const today = new Date();
+    document.getElementById('task-view-date').textContent = today.toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric'
+    });
+
+    function openProject(projectUid) {
+        const project = PROJECTS_DATA.find(p => p.project_uid === projectUid);
+        if (!project) return;
+        console.log("Opening project:", project);
+        console.log(PROJECTS_DATA);
+
+        document.getElementById('task-view-project-name').textContent = project.project_name;
+
+        ['todo', 'in-progress', 'review', 'done'].forEach(id => {
+            document.getElementById(`tasks-${id}`).innerHTML = '';
+        });
+
+        (project.tasks || []).forEach(task => {
+            const card = document.createElement('div');
+            card.classList.add('task-card');
+            card.innerHTML = `
+                <p>${task.name}</p>
+                <span class="task-priority priority-${task.priority}">${task.priority}</span>
+            `;
+            const columnMap = {
+                'todo': 'tasks-todo',
+                'in-progress': 'tasks-in-progress',
+                'review': 'tasks-review',
+                'done': 'tasks-done'
+            };
+            document.getElementById(columnMap[task.status] || 'tasks-todo').appendChild(card);
+        });
+
+        document.getElementById('projects-table-view').style.display = 'none';
+        document.getElementById('project-task-view').style.display = 'block';
+    }
+
+    function closeProject() {
+        document.getElementById('projects-table-view').style.display = 'block';
+        document.getElementById('project-task-view').style.display = 'none';
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+
+    function filterProjects() {
+        const query = document.getElementById('project-search-input').value.toLowerCase();
+        document.querySelectorAll('.project-card').forEach(card => {
+            const name = card.querySelector('h4').textContent.toLowerCase();
+            card.style.display = name.includes(query) ? 'block' : 'none';
+        });
+    }
+</script>
+
+<!-- Modal logic -->
+<script>
+    const createProjectBtn = document.getElementById('create-project');
+    const createProjectDiv = document.querySelector('.create-project');
+
+    const overlay = document.createElement('div');
+    overlay.classList.add('modal-overlay');
+    document.body.appendChild(overlay);
+
+    createProjectDiv.style.display = 'none';
+    overlay.style.display = 'none';
+
+    function openModal() {
+        createProjectDiv.style.display = 'block';
+        overlay.style.display = 'block';
+    }
+
+    function closeModal() {
+        createProjectDiv.style.display = 'none';
+        overlay.style.display = 'none';
+    }
+
+    createProjectBtn.addEventListener('click', openModal);
+    overlay.addEventListener('click', closeModal);
+    document.getElementById('close-create-project').addEventListener('click', closeModal);
+</script>
+
 
 {% endblock %}
