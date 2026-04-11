@@ -4,5 +4,26 @@
 
 {% block content %}
 {% set user = session_data() %}
-<h1>Welcome, {{ user.name }}</h1>
+<div class="welcome-section">
+    <h1>Welcome back, {{ user.name }}!</h1>
+    <p>Manage your projects and tasks efficiently with our task management system.</p>
+</div>
+
+<div class="dashboard-cards">
+    <div class="card">
+        <h3>Projects</h3>
+        <p>View and manage all your projects</p>
+        <a href="{{ url_for('projects.projects') }}" class="card-link">Go to Projects</a>
+    </div>
+    <div class="card">
+        <h3>Tasks</h3>
+        <p>Track your tasks and progress</p>
+        <a href="{{ url_for('projects.projects') }}" class="card-link">View Tasks</a>
+    </div>
+    <div class="card">
+        <h3>Members</h3>
+        <p>Connect with your team members</p>
+        <a href="{{ url_for('members.members') }}" class="card-link">View Members</a>
+    </div>
+</div>
 {% endblock %}

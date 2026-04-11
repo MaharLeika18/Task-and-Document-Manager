@@ -29,6 +29,22 @@ def login():
         session["name"] = decoded_token.get("name")
         session['picture'] = decoded_token.get("picture")
         session["current_session_id"] = generate_secure_string(20)
+        
+        # Ensure user exists in Firestore (for Google login users)
+        user_ref = db.collection('users').document(uid)
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            # Create user document if it doesn't exist
+            user_data = {
+                'uid': uid,
+                'username': decoded_token.get("name") or decoded_token.get("email", "").split('@')[0],
+                'display_name': decoded_token.get("name") or "User",
+                'email': decoded_token.get("email"),
+                'date_created': datetime.now().strftime('%m/%d/%Y'),
+                'picture': decoded_token.get("picture", '')
+            }
+            user_ref.set(user_data)
+        
         print(decoded_token)
         return jsonify(success=True, uid=uid, name=decoded_token.get("name"))
 

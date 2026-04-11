@@ -18,6 +18,7 @@ def index():
 @register_bp.route("/register_user", methods=["POST"])
 def register():
     token = request.json.get("token")
+    user_data = request.json.get("user_data")
     try:
         decoded = auth.verify_id_token(token)
         session["uid"] = decoded["uid"]
@@ -26,7 +27,18 @@ def register():
         session['picture'] = decoded.get("picture")
         session["current_session_id"] = generate_secure_string(20)
         
-
+        # Save user data to Firestore
+        if user_data:
+            user_ref = db.collection('users').document(decoded["uid"])
+            user_ref.set({
+                'uid': decoded["uid"],
+                'username': user_data.get('username', ''),
+                'display_name': user_data.get('display_name', ''),
+                'email': decoded.get("email"),
+                'date_created': user_data.get('date_created', ''),
+                'picture': decoded.get("picture", '')
+            })
+        
         return jsonify(success=True)
 
     except Exception as e:

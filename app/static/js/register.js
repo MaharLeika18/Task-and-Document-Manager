@@ -56,17 +56,16 @@ email_reg.addEventListener('submit', async (e) => {
         
         const token = await user.getIdToken();
         
-        // Send to Flask
+        // Send to Flask with user data
         const res = await fetch("/register/register_user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token })
+            body: JSON.stringify({ token, user_data: register_data })
         });
         
         const data = await res.json();
         console.log(data)
         if (data.success) {
-            await addData(register_data);
             alert("Registration successful!");
             window.location.href = "/home";
         } else {
@@ -87,17 +86,6 @@ google_reg.addEventListener("click", async (e) => {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
 
-        const idToken = await user.getIdToken();
-
-        const res = await fetch("/register/register_user", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: idToken })
-        });
-
-        const data = await res.json();
-        if (!data.success) throw new Error("Backend auth failed");
-
         const date = new Date();
         const register_data = {
             uid: user.uid,
@@ -107,7 +95,17 @@ google_reg.addEventListener("click", async (e) => {
             date_created: `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`,
         };
 
-        await addData(register_data);
+        const idToken = await user.getIdToken();
+
+        const res = await fetch("/register/register_user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: idToken, user_data: register_data })
+        });
+
+        const data = await res.json();
+        if (!data.success) throw new Error("Backend auth failed");
+
         alert("Registration successful!");
         window.location.href = "/home";
 
@@ -117,20 +115,3 @@ google_reg.addEventListener("click", async (e) => {
     }
 });
 
-async function addData(data) {
-    try {
-        const userRef = doc(db, "users", data.uid);
-        const userSnap = await getDoc(userRef);
-
-        if (userSnap.exists()) {
-            console.log("✅ User already exists");
-            window.location.href = "/home";
-        } else {
-            await setDoc(userRef, data);
-            console.log("✅ Document written with UID: ", data.uid);
-        }
-    } catch (e) {
-        console.error("❌ Error adding document: ", e);
-        alert("Something went wrong.");
-    }
-}

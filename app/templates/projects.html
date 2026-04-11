@@ -386,5 +386,260 @@
     document.getElementById('close-create-project').addEventListener('click', closeModal);
 </script>
 
+<!-- Task Management JavaScript -->
+<script>
+    let currentProjectUid = null;
+
+    // Make task cards draggable and clickable
+    function makeTasksInteractive() {
+        document.querySelectorAll('.task-card').forEach(card => {
+            // Add click handler for status change
+            card.addEventListener('click', function() {
+                showTaskStatusMenu(this);
+            });
+
+            // Make cards draggable
+            card.draggable = true;
+            card.addEventListener('dragstart', handleDragStart);
+        });
+
+        // Add drop zones to columns
+        document.querySelectorAll('.task-column').forEach(column => {
+            column.addEventListener('dragover', handleDragOver);
+            column.addEventListener('drop', handleDrop);
+        });
+    }
+
+    function showTaskStatusMenu(taskCard) {
+        const taskName = taskCard.querySelector('p').textContent;
+        const currentStatus = getTaskStatusFromColumn(taskCard.parentElement.id);
+
+        // Create status menu
+        const menu = document.createElement('div');
+        menu.className = 'status-menu';
+        menu.innerHTML = `
+            <div class="status-option" data-status="todo">To Do</div>
+            <div class="status-option" data-status="in-progress">In Progress</div>
+            <div class="status-option" data-status="review">Review</div>
+            <div class="status-option" data-status="done">Done</div>
+        `;
+
+        // Position menu
+        const rect = taskCard.getBoundingClientRect();
+        menu.style.position = 'absolute';
+        menu.style.left = rect.left + 'px';
+        menu.style.top = rect.bottom + 'px';
+        menu.style.zIndex = '1000';
+
+        document.body.appendChild(menu);
+
+        // Handle status selection
+        menu.addEventListener('click', function(e) {
+            if (e.target.classList.contains('status-option')) {
+                const newStatus = e.target.dataset.status;
+                updateTaskStatus(taskName, newStatus);
+                document.body.removeChild(menu);
+            }
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target) && e.target !== taskCard) {
+                if (document.body.contains(menu)) {
+                    document.body.removeChild(menu);
+                }
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    }
+
+    function getTaskStatusFromColumn(columnId) {
+        const statusMap = {
+            'tasks-todo': 'todo',
+            'tasks-in-progress': 'in-progress',
+            'tasks-review': 'review',
+            'tasks-done': 'done'
+        };
+        return statusMap[columnId] || 'todo';
+    }
+
+    function updateTaskStatus(taskName, newStatus) {
+        if (!currentProjectUid) return;
+
+        fetch('/projects/update_task_status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                project_uid: currentProjectUid,
+                task_name: taskName,
+                status: newStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Refresh the project view
+                location.reload();
+            } else {
+                alert('Error updating task: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating task status');
+        });
+    }
+
+    // Drag and drop functionality
+    function handleDragStart(e) {
+        e.dataTransfer.setData('text/plain', e.target.querySelector('p').textContent);
+        e.target.classList.add('dragging');
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+
+        const taskName = e.dataTransfer.getData('text/plain');
+        const newStatus = getTaskStatusFromColumn(e.currentTarget.querySelector('div[id]').id);
+
+        updateTaskStatus(taskName, newStatus);
+    }
+
+    // Add new task functionality
+    document.querySelector('.create-task-btn').addEventListener('click', function() {
+        showAddTaskModal();
+    });
+
+    function showAddTaskModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Add New Task</h2>
+                <form id="add-task-form">
+                    <input type="text" id="task-name" placeholder="Task name" required>
+                    <select id="task-priority">
+                        <option value="low">Low Priority</option>
+                        <option value="medium" selected>Medium Priority</option>
+                        <option value="high">High Priority</option>
+                    </select>
+                    <div id="task-members">
+                        <label><input type="checkbox" value="{{ user.uid }}" checked> {{ user.name }} (You)</label>
+                        {% for member in members %}
+                        {% if member.uid != user.uid %}
+                        <label><input type="checkbox" value="{{ member.uid }}"> {{ member.name }}</label>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    <button type="submit">Add Task</button>
+                </form>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Handle form submission
+        modal.querySelector('#add-task-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const taskName = document.getElementById('task-name').value;
+            const priority = document.getElementById('task-priority').value;
+            const members = Array.from(document.querySelectorAll('#task-members input:checked')).map(cb => cb.value);
+
+            addNewTask(taskName, priority, members);
+            document.body.removeChild(modal);
+        });
+
+        // Close modal
+        modal.querySelector('.close').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+    }
+
+    function addNewTask(taskName, priority, members) {
+        if (!currentProjectUid) return;
+
+        fetch('/projects/add_task', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                project_uid: currentProjectUid,
+                name: taskName,
+                priority: priority,
+                members: members
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error adding task: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding new task');
+        });
+    }
+
+    // Initialize interactive elements when project is opened
+    const originalOpenProject = window.openProject;
+    window.openProject = function(element) {
+        originalOpenProject(element);
+        currentProjectUid = element.getAttribute('data-project-uid');
+        // Wait a bit for DOM to update, then make tasks interactive
+        setTimeout(makeTasksInteractive, 100);
+    };
+</script>
+
+<!-- Status Menu Styles -->
+<style>
+    .status-menu {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        min-width: 150px;
+    }
+
+    .status-option {
+        padding: 10px 15px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .status-option:hover {
+        background-color: #f8f9fa;
+    }
+
+    .task-card {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .task-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .task-card.dragging {
+        opacity: 0.5;
+    }
+
+    .task-column.drag-over {
+        background-color: #f0f8ff;
+    }
+</style>
 
 {% endblock %}

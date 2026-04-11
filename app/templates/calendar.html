@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Calendar{% endblock %}
+
+{% block content %}
+<h1>Project Calendar</h1>
+
+<div class="calendar-container">
+    <div class="calendar-header">
+        <button id="prev-month">&lt;</button>
+        <h2 id="calendar-title" class="calendar-title"></h2>
+        <button id="next-month">&gt;</button>
+    </div>
+
+    <div class="calendar-grid">
+        <div class="day-header">Sun</div>
+        <div class="day-header">Mon</div>
+        <div class="day-header">Tue</div>
+        <div class="day-header">Wed</div>
+        <div class="day-header">Thu</div>
+        <div class="day-header">Fri</div>
+        <div class="day-header">Sat</div>
+    </div>
+
+    <div id="calendar-days" class="calendar-days">
+        <!-- Calendar days will be populated by JavaScript -->
+    </div>
+</div>
+
+<div class="upcoming-events">
+    <h2>Upcoming Events</h2>
+    <div id="events-list">
+        <!-- Events will be populated here -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Simple calendar implementation
+    const calendarDays = document.getElementById('calendar-days');
+    const calendarTitle = document.getElementById('calendar-title');
+    const prevButton = document.getElementById('prev-month');
+    const nextButton = document.getElementById('next-month');
+
+    let currentDate = new Date();
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+
+        calendarTitle.textContent = new Date(year, month).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long'
+        });
+
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+        calendarDays.innerHTML = '';
+
+        for (let i = 0; i < 42; i++) {
+            const day = new Date(startDate);
+            day.setDate(startDate.getDate() + i);
+
+            const dayElement = document.createElement('div');
+            dayElement.classList.add('calendar-day');
+
+            if (day.getMonth() !== month) {
+                dayElement.classList.add('other-month');
+            }
+
+            if (day.toDateString() === new Date().toDateString()) {
+                dayElement.classList.add('today');
+            }
+
+            dayElement.textContent = day.getDate();
+            calendarDays.appendChild(dayElement);
+        }
+    }
+
+    prevButton.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        renderCalendar();
+    });
+
+    nextButton.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        renderCalendar();
+    });
+
+    renderCalendar();
+</script>
+{% endblock %}

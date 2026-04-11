@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Members{% endblock %}
+
+{% block content %}
+<h1>Team Members</h1>
+
+<div class="members-grid">
+    {% for member in members %}
+    <div class="member-card">
+        <div class="member-avatar">
+            {% if member.picture %}
+                <img src="{{ member.picture }}" alt="{{ member.name }}">
+            {% else %}
+                <div class="default-avatar">{{ member.name[0].upper() }}</div>
+            {% endif %}
+        </div>
+        <div class="member-info">
+            <h3>{{ member.name }}</h3>
+            <p>{{ member.email }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

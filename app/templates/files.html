@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Files{% endblock %}
+
+{% block content %}
+<h1>Project Files</h1>
+
+<div class="files-container">
+    <div class="files-header">
+        <div class="file-actions">
+            <button id="upload-file" class="btn-primary">Upload File</button>
+            <button id="create-folder" class="btn-secondary">Create Folder</button>
+        </div>
+        <div class="file-search">
+            <input type="text" placeholder="Search files..." id="file-search">
+        </div>
+    </div>
+
+    <div class="files-grid">
+        <div class="file-item folder">
+            <div class="file-icon">📁</div>
+            <div class="file-info">
+                <h4>Project Documents</h4>
+                <p>Modified 2 days ago</p>
+            </div>
+        </div>
+
+        <div class="file-item file">
+            <div class="file-icon">📄</div>
+            <div class="file-info">
+                <h4>requirements.pdf</h4>
+                <p>2.3 MB • Modified yesterday</p>
+            </div>
+        </div>
+
+        <div class="file-item file">
+            <div class="file-icon">🖼️</div>
+            <div class="file-info">
+                <h4>mockup.png</h4>
+                <p>1.8 MB • Modified 3 days ago</p>
+            </div>
+        </div>
+
+        <div class="file-item file">
+            <div class="file-icon">📊</div>
+            <div class="file-info">
+                <h4>project_plan.xlsx</h4>
+                <p>456 KB • Modified 1 week ago</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Upload File</h2>
+        <form id="upload-form">
+            <input type="file" id="file-input" multiple>
+            <button type="submit" class="btn-primary">Upload</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // File upload modal
+    const uploadModal = document.getElementById('upload-modal');
+    const uploadBtn = document.getElementById('upload-file');
+    const closeBtn = document.querySelector('.close');
+
+    uploadBtn.onclick = function() {
+        uploadModal.style.display = 'block';
+    }
+
+    closeBtn.onclick = function() {
+        uploadModal.style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        if (event.target == uploadModal) {
+            uploadModal.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

@@ -5,17 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Home{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
-
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="icon" type="image/svg+xml" href="" />
-    <link rel="stylesheet" href="/style.css" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap" rel="stylesheet">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
     {% block extra_css %}{% endblock %}
@@ -24,41 +18,26 @@
     {% set user = session_data() %}
     <nav class="navbar">
         <div class="logos">
-            <img src="{{ url_for('static', filename='images/ccs_logo.png') }}" alt="CCS">
-            <img src="{{ url_for('static', filename='images/perps_logo.png') }}" alt="Perps">
-            <img src="{{ url_for('static', filename='images/aura404_logo.png') }}" alt="Aura404">
+            <h2>Task Manager</h2>
         </div>
 
         <div class="search-bar">
             <form action="#" method="GET">
                 <input type="text" name="q" placeholder="Search People, Projects or Tasks">
                 <button type="submit">
-                    <i class="fa fa-search"></i>
+                    <span class="material-symbols-outlined">search</span>
                 </button>
             </form>
-            {#Ginawa ko munang comment hehe nageerror e di ko pa nalalagay yung routes gois HAAHAHAHAHA#}
-            {# <form action="{{ url_for('search') }}" method="GET">
-                <input type="text" name="q" placeholder="Search People, Projects or Tasks">
-                <button type="submit">
-                    <i class="fa fa-search"></i>
-                </button>
-            </form> #}
         </div>
 
         <div class="utilities">
-            {# 
-                will prolly add js logic here to display the things in the notifications and messages instead of linking to a separate page
-            #}
-            <a href="#" class="notification-button"></a>
-            <a href="#" class="mail-button"></a>
-            <a href="#" class="profile-button"><img src="{{ session_data().get('picture') }}" alt=""></a>
-
-            {#Ginawa ko munang comment hehe nageerror e di ko pa nalalagay yung routes goisHAAHAHAHAHA#}
-            {# Maybe will use some frontend fetch na lang to put some notifications, mails and the profiles instead 
-            of aalways calling sa baackend??? HAAHAAHAHAA idk man icaache na lang???#}
-            {# <a href="{{ url_for('notifications') }}" class="notification-button"></a>
-            <a href="{{ url_for('messages') }}" class="mail-button"></a>
-            <a href="{{ url_for('profile') }}" class="profile-button"></a> #}
+            <button class="notification-button" title="Notifications">
+                <span class="material-symbols-outlined">notifications</span>
+            </button>
+            <button class="mail-button" title="Messages">
+                <span class="material-symbols-outlined">mail</span>
+            </button>
+            <a href="#" class="profile-button"><img src="{{ session_data().get('picture') }}" alt="Profile"></a>
         </div>
     </nav>
 
@@ -72,53 +51,22 @@
         </ul>
 
         <div class="dailies">
-            <div class="add-dailies"></div>
+            <div class="add-dailies">
+                <button id="add-daily-btn" title="Add Daily">
+                    <span class="material-symbols-outlined">add</span>
+                </button>
+            </div>
             <h1>Dailies</h1>
-            <a href="#" id="add-dailies"> 
-                {# 
-                    will prolly add js logic here instead of the add_daily url
-                    to open a screen to add a daily without leaving the page
-                    will go back to it later
-                #}
-                <i class="fa fa-add"></i>
-            </a>
-            {# <div class="add-dailies"></div>
-            <h1>Dailies</h1>
-            <a href="{{ url_for('add_daily') }}" id="add-dailies"> 
-                {# 
-                    will prolly add js logic here instead of the add_daily url
-                    to open a screen to add a daily without leaving the page
-                    will go back to it later
-                #}
-                <i class="fa fa-add"></i>
-            </a> 
-            
-
-            {# Nilagay ko muna sa comments for now kasi di ko pa mabuild yung functionalities#}
-            {# <ul class="dailies">
-                {% for daily in dailies %}
-                    <li>
-                        <div class="daily-item">
-                            <h2>{{ daily.title }}</h2>
-                            <p>{{ daily.description }}</p>
-                        </div>
-                    </li>
-                {% else %}
-                    <li class="empty">No dailies yet</li>
-                {% endfor %}
-            </ul> #}
+            <div class="dailies-list">
+                <!-- Daily items will be populated here -->
+            </div>
         </div>
 
         <div class="logout">
-            <button id='logout_btn'>
-                <i class="fa fa-sign-out"></i> Logout
+            <button id="logout_btn">
+                <span class="material-symbols-outlined">logout</span> Logout
             </button>
         </div>
-        {# <div class="logout">
-            <a href="{{ url_for('logout') }}">
-                <i class="fa fa-sign-out"></i> Logout
-            </a>
-        </div> #}
     </div>
 
     {# MAIN CONTENT AREA #}
