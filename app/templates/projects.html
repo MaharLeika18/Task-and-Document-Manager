@@ -118,6 +118,11 @@
                         {% if project.status == 'current' %}
                             <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
+                                <div class="project-card-meta">
+                                    <span class="badge">{{ project.status|capitalize }}</span>
+                                    <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
+                                    <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
+                                </div>
                                 <p>{{ project.project_description }}</p>
                             </div>
                         {% endif %}
@@ -131,6 +136,11 @@
                         {% if project.status == 'upcoming' %}
                             <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
+                                <div class="project-card-meta">
+                                    <span class="badge">{{ project.status|capitalize }}</span>
+                                    <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
+                                    <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
+                                </div>
                                 <p>{{ project.project_description }}</p>
                             </div>
                         {% endif %}
@@ -144,6 +154,11 @@
                         {% if project.status == 'finished' %}
                             <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
+                                <div class="project-card-meta">
+                                    <span class="badge">{{ project.status|capitalize }}</span>
+                                    <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
+                                    <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
+                                </div>
                                 <p>{{ project.project_description }}</p>
                             </div>
                         {% endif %}
@@ -165,6 +180,41 @@
             </div>
 
             <h2 id="task-view-project-name"></h2>
+
+            <div class="project-summary-grid">
+                <div class="project-card-summary">
+                    <h3>Project overview</h3>
+                    <div class="summary-row"><span>Status</span><strong id="project-status-label"></strong></div>
+                    <div class="summary-row"><span>Category</span><strong id="project-category-label"></strong></div>
+                    <div class="summary-row"><span>Priority</span><strong id="project-priority-label"></strong></div>
+                    <div class="summary-row"><span>Timeline</span><strong id="project-timeline"></strong></div>
+                    <div class="summary-row"><span>Members</span><strong id="project-members-label"></strong></div>
+                </div>
+                <div class="project-card-summary">
+                    <h3>Progress</h3>
+                    <div class="summary-row"><span>Total tasks</span><strong id="project-total-tasks">0</strong></div>
+                    <div class="summary-row"><span>Completed</span><strong id="project-completed-tasks">0</strong></div>
+                    <div class="summary-row"><span>Open</span><strong id="project-open-tasks">0</strong></div>
+                    <div class="summary-row"><span>Backlog</span><strong id="project-backlog-tasks">0</strong></div>
+                    <div class="project-progress-bar"><div id="project-progress-bar-fill"></div></div>
+                </div>
+            </div>
+
+            <div id="task-detail-card" class="task-detail-card" style="display: none;">
+                <div class="task-detail-header">
+                    <div>
+                        <h3 id="task-detail-title"></h3>
+                        <p id="task-detail-project"></p>
+                    </div>
+                    <span id="task-detail-priority" class="task-priority"></span>
+                </div>
+                <div class="task-detail-body">
+                    <div><strong>Status:</strong> <span id="task-detail-status"></span></div>
+                    <div><strong>Due:</strong> <span id="task-detail-due"></span></div>
+                    <div><strong>Assigned to:</strong> <span id="task-detail-members"></span></div>
+                    <div><strong>Event:</strong> <a href="#" target="_blank" id="task-detail-link">Open in Google Calendar</a></div>
+                </div>
+            </div>
 
             <div class="task-view-tabs">
                 <button type="button" class="tab-btn active" onclick="switchTab('tasks')">Tasks</button>
@@ -196,6 +246,30 @@
                     <div class="task-column">
                         <div class="column-header">DONE</div>
                         <div id="tasks-done"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-backlog" class="tab-panel" style="display:none;">
+                <div class="backlog-search">
+                    <input type="text" placeholder="Search Backlog tasks..." oninput="filterBacklog()">
+                </div>
+                <div id="backlog-list" class="backlog-list"></div>
+            </div>
+
+            <div id="tab-reports" class="tab-panel" style="display:none;">
+                <div class="report-grid">
+                    <div class="report-card">
+                        <h4>Task health</h4>
+                        <p id="report-task-health"></p>
+                    </div>
+                    <div class="report-card">
+                        <h4>Priority breakdown</h4>
+                        <p id="report-priority-breakdown"></p>
+                    </div>
+                    <div class="report-card">
+                        <h4>Assigned members</h4>
+                        <p id="report-member-breakdown"></p>
                     </div>
                 </div>
             </div>
@@ -288,56 +362,182 @@
         month: 'long', day: 'numeric', year: 'numeric'
     });
 
-    function openProject(element) {
-        // Get project UID from the data attribute
-        const projectUid = element.getAttribute('data-project-uid');
-        const project = PROJECTS_DATA.find(p => p.project_uid === projectUid);
-        
-        if (!project) {
-            console.error("[v0] Project not found for UID:", projectUid);
+    function getMemberName(uid) {
+        if (uid === CURRENT_USER.uid) {
+            return CURRENT_USER.name;
+        }
+        const member = ALL_MEMBERS.find(m => m.uid === uid);
+        return member ? member.name : 'Unknown';
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) {
+            return 'TBD';
+        }
+        const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) {
+            return dateString;
+        }
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function showTaskDetails(task, project) {
+        document.getElementById('task-detail-card').style.display = 'block';
+        document.getElementById('task-detail-title').textContent = task.name;
+        document.getElementById('task-detail-project').textContent = project.project_name;
+        document.getElementById('task-detail-priority').textContent = task.priority;
+        document.getElementById('task-detail-status').textContent = task.status.replace('-', ' ');
+        document.getElementById('task-detail-due').textContent = formatDate(task.due_date);
+        document.getElementById('task-detail-members').textContent = task.members.map(getMemberName).join(', ');
+
+        const linkElement = document.getElementById('task-detail-link');
+        if (task.event_link) {
+            linkElement.href = task.event_link;
+            linkElement.textContent = 'Open in Google Calendar';
+            linkElement.style.display = 'inline-block';
+        } else {
+            linkElement.style.display = 'none';
+        }
+    }
+
+    function renderTaskCard(task, project) {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.dataset.taskName = task.name;
+        card.innerHTML = `
+            <div class="task-card-header">
+                <p>${task.name}</p>
+                <button type="button" class="task-status-btn">${task.status.replace('-', ' ')}</button>
+            </div>
+            <div class="task-card-meta">
+                <span>${formatDate(task.due_date)}</span>
+                <span>${task.members.length} assigned</span>
+            </div>
+            <span class="task-priority priority-${task.priority}">${task.priority}</span>
+        `;
+
+        if (task.status === 'done') {
+            card.classList.add('task-card-completed');
+        }
+
+        card.addEventListener('click', () => showTaskDetails(task, project));
+        card.addEventListener('dragstart', handleDragStart);
+
+        const statusButton = card.querySelector('.task-status-btn');
+        statusButton.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showTaskStatusMenu(card, task);
+        });
+
+        return card;
+    }
+
+    function renderProjectSummary(project) {
+        const tasks = project.tasks || [];
+        const completedTasks = tasks.filter(task => task.status === 'done').length;
+        const openTasks = tasks.length - completedTasks;
+        const backlogTasks = tasks.filter(task => task.status === 'todo').length;
+        const progressPercent = tasks.length ? Math.round((completedTasks / tasks.length) * 100) : 0;
+
+        document.getElementById('project-status-label').textContent = project.status || 'Unknown';
+        document.getElementById('project-category-label').textContent = project.category || 'Unspecified';
+        document.getElementById('project-priority-label').textContent = project.priority || 'Medium';
+        document.getElementById('project-timeline').textContent = `${formatDate(project.start_date)} — ${formatDate(project.end_date)}`;
+        document.getElementById('project-members-label').innerHTML = project.assigned_members.map(uid => `<span class="member-chip">${getMemberName(uid)}</span>`).join(' ');
+
+        document.getElementById('project-total-tasks').textContent = tasks.length;
+        document.getElementById('project-completed-tasks').textContent = completedTasks;
+        document.getElementById('project-open-tasks').textContent = openTasks;
+        document.getElementById('project-backlog-tasks').textContent = backlogTasks;
+        document.getElementById('project-progress-bar-fill').style.width = `${progressPercent}%`;
+    }
+
+    function renderProjectTasks(project) {
+        ['todo', 'in-progress', 'review', 'done'].forEach(status => {
+            const column = document.getElementById(`tasks-${status}`);
+            if (column) column.innerHTML = '';
+        });
+
+        (project.tasks || []).forEach(task => {
+            const card = renderTaskCard(task, project);
+            const columnId = {
+                todo: 'tasks-todo',
+                'in-progress': 'tasks-in-progress',
+                review: 'tasks-review',
+                done: 'tasks-done'
+            }[task.status] || 'tasks-todo';
+            document.getElementById(columnId).appendChild(card);
+        });
+    }
+
+    function renderBacklog(project) {
+        const backlogContainer = document.getElementById('backlog-list');
+        backlogContainer.innerHTML = '';
+        const backlogTasks = (project.tasks || []).filter(task => task.status === 'todo');
+
+        if (!backlogTasks.length) {
+            backlogContainer.innerHTML = '<p class="empty-state">No backlog tasks available right now.</p>';
             return;
         }
-        
-        console.log("[v0] Opening project:", project);
 
-        // Update the project name in the task view
-        document.getElementById('task-view-project-name').textContent = project.project_name;
-
-        // Clear all task columns
-        ['todo', 'in-progress', 'review', 'done'].forEach(status => {
-            const columnId = `tasks-${status}`;
-            const column = document.getElementById(columnId);
-            if (column) {
-                column.innerHTML = '';
-            }
-        });
-
-        // Populate tasks into their respective columns
-        (project.tasks || []).forEach(task => {
-            const card = document.createElement('div');
-            card.classList.add('task-card');
-            card.innerHTML = `
-                <p>${task.name}</p>
+        backlogTasks.forEach(task => {
+            const taskRow = document.createElement('div');
+            taskRow.className = 'backlog-task-card';
+            taskRow.innerHTML = `
+                <div>
+                    <h4>${task.name}</h4>
+                    <p>Due ${formatDate(task.due_date)} • ${task.members.length} assignee${task.members.length !== 1 ? 's' : ''}</p>
+                </div>
                 <span class="task-priority priority-${task.priority}">${task.priority}</span>
             `;
-            
-            const columnMap = {
-                'todo': 'tasks-todo',
-                'in-progress': 'tasks-in-progress',
-                'review': 'tasks-review',
-                'done': 'tasks-done'
-            };
-            
-            const targetColumnId = columnMap[task.status] || 'tasks-todo';
-            const targetColumn = document.getElementById(targetColumnId);
-            if (targetColumn) {
-                targetColumn.appendChild(card);
-            }
+            backlogContainer.appendChild(taskRow);
+        });
+    }
+
+    function renderReports(project) {
+        const tasks = project.tasks || [];
+        const statusCounts = tasks.reduce((acc, task) => {
+            acc[task.status] = (acc[task.status] || 0) + 1;
+            return acc;
+        }, {});
+        const priorityCounts = tasks.reduce((acc, task) => {
+            acc[task.priority] = (acc[task.priority] || 0) + 1;
+            return acc;
+        }, {});
+        const memberCounts = {};
+        tasks.forEach(task => {
+            task.members.forEach(uid => {
+                const name = getMemberName(uid);
+                memberCounts[name] = (memberCounts[name] || 0) + 1;
+            });
         });
 
-        // Switch views
+        document.getElementById('report-task-health').textContent = `${statusCounts.done || 0} done, ${statusCounts['in-progress'] || 0} in progress, ${statusCounts.review || 0} in review`;
+        document.getElementById('report-priority-breakdown').textContent = `High: ${priorityCounts.high || 0}, Medium: ${priorityCounts.medium || 0}, Low: ${priorityCounts.low || 0}`;
+        document.getElementById('report-member-breakdown').textContent = Object.entries(memberCounts)
+            .map(([name, count]) => `${name}: ${count}`)
+            .join(' • ') || 'No tasks assigned yet';
+    }
+
+    function openProject(element) {
+        const projectUid = element.getAttribute('data-project-uid');
+        const project = PROJECTS_DATA.find(p => p.project_uid === projectUid);
+        if (!project) {
+            console.error('[v0] Project not found for UID:', projectUid);
+            return;
+        }
+
+        currentProjectUid = projectUid;
+        document.getElementById('task-view-project-name').textContent = project.project_name;
+        document.getElementById('task-detail-card').style.display = 'none';
+        renderProjectSummary(project);
+        renderProjectTasks(project);
+        renderBacklog(project);
+        renderReports(project);
+
         document.getElementById('projects-table-view').style.display = 'none';
         document.getElementById('project-task-view').style.display = 'block';
+        switchTab('tasks');
     }
 
     function closeProject() {
@@ -347,7 +547,9 @@
 
     function switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        event.target.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(panel => panel.style.display = 'none');
+        document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+        document.getElementById(`tab-${tab}`).style.display = 'block';
     }
 
     function filterProjects() {
@@ -355,6 +557,14 @@
         document.querySelectorAll('.project-card').forEach(card => {
             const name = card.querySelector('h4').textContent.toLowerCase();
             card.style.display = name.includes(query) ? 'block' : 'none';
+        });
+    }
+
+    function filterBacklog() {
+        const query = document.querySelector('#tab-backlog input').value.toLowerCase();
+        document.querySelectorAll('.backlog-task-card').forEach(card => {
+            const title = card.querySelector('h4').textContent.toLowerCase();
+            card.style.display = title.includes(query) ? 'flex' : 'none';
         });
     }
 </script>
@@ -393,28 +603,19 @@
     // Make task cards draggable and clickable
     function makeTasksInteractive() {
         document.querySelectorAll('.task-card').forEach(card => {
-            // Add click handler for status change
-            card.addEventListener('click', function() {
-                showTaskStatusMenu(this);
-            });
-
-            // Make cards draggable
             card.draggable = true;
             card.addEventListener('dragstart', handleDragStart);
         });
 
-        // Add drop zones to columns
         document.querySelectorAll('.task-column').forEach(column => {
             column.addEventListener('dragover', handleDragOver);
             column.addEventListener('drop', handleDrop);
         });
     }
 
-    function showTaskStatusMenu(taskCard) {
-        const taskName = taskCard.querySelector('p').textContent;
-        const currentStatus = getTaskStatusFromColumn(taskCard.parentElement.id);
+    function showTaskStatusMenu(taskCard, task) {
+        const taskName = task.name;
 
-        // Create status menu
         const menu = document.createElement('div');
         menu.className = 'status-menu';
         menu.innerHTML = `
@@ -424,16 +625,14 @@
             <div class="status-option" data-status="done">Done</div>
         `;
 
-        // Position menu
         const rect = taskCard.getBoundingClientRect();
         menu.style.position = 'absolute';
-        menu.style.left = rect.left + 'px';
-        menu.style.top = rect.bottom + 'px';
+        menu.style.left = `${rect.left}px`;
+        menu.style.top = `${rect.bottom + 8}px`;
         menu.style.zIndex = '1000';
 
         document.body.appendChild(menu);
 
-        // Handle status selection
         menu.addEventListener('click', function(e) {
             if (e.target.classList.contains('status-option')) {
                 const newStatus = e.target.dataset.status;
@@ -442,7 +641,6 @@
             }
         });
 
-        // Close menu when clicking outside
         document.addEventListener('click', function closeMenu(e) {
             if (!menu.contains(e.target) && e.target !== taskCard) {
                 if (document.body.contains(menu)) {
@@ -480,7 +678,6 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Refresh the project view
                 location.reload();
             } else {
                 alert('Error updating task: ' + data.message);
@@ -492,9 +689,9 @@
         });
     }
 
-    // Drag and drop functionality
     function handleDragStart(e) {
-        e.dataTransfer.setData('text/plain', e.target.querySelector('p').textContent);
+        const taskName = e.target.dataset.taskName || e.target.querySelector('p').textContent;
+        e.dataTransfer.setData('text/plain', taskName);
         e.target.classList.add('dragging');
     }
 
@@ -508,7 +705,7 @@
         e.currentTarget.classList.remove('drag-over');
 
         const taskName = e.dataTransfer.getData('text/plain');
-        const newStatus = getTaskStatusFromColumn(e.currentTarget.querySelector('div[id]').id);
+        const newStatus = getTaskStatusFromColumn(e.currentTarget.id);
 
         updateTaskStatus(taskName, newStatus);
     }
@@ -532,6 +729,7 @@
                         <option value="medium" selected>Medium Priority</option>
                         <option value="high">High Priority</option>
                     </select>
+                    <input type="date" id="task-due-date" required>
                     <div id="task-members">
                         <label><input type="checkbox" value="{{ user.uid }}" checked> {{ user.name }} (You)</label>
                         {% for member in members %}
@@ -552,9 +750,10 @@
             e.preventDefault();
             const taskName = document.getElementById('task-name').value;
             const priority = document.getElementById('task-priority').value;
+            const dueDate = document.getElementById('task-due-date').value;
             const members = Array.from(document.querySelectorAll('#task-members input:checked')).map(cb => cb.value);
 
-            addNewTask(taskName, priority, members);
+            addNewTask(taskName, priority, members, dueDate);
             document.body.removeChild(modal);
         });
 
@@ -564,7 +763,7 @@
         });
     }
 
-    function addNewTask(taskName, priority, members) {
+    function addNewTask(taskName, priority, members, dueDate) {
         if (!currentProjectUid) return;
 
         fetch('/projects/add_task', {
@@ -576,6 +775,7 @@
                 project_uid: currentProjectUid,
                 name: taskName,
                 priority: priority,
+                due_date: dueDate,
                 members: members
             })
         })

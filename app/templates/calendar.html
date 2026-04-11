@@ -42,8 +42,10 @@
     const calendarTitle = document.getElementById('calendar-title');
     const prevButton = document.getElementById('prev-month');
     const nextButton = document.getElementById('next-month');
+    const eventsList = document.getElementById('events-list');
 
     let currentDate = new Date();
+    let calendarEvents = [];
 
     function renderCalendar() {
         const year = currentDate.getFullYear();
@@ -76,9 +78,83 @@
                 dayElement.classList.add('today');
             }
 
-            dayElement.textContent = day.getDate();
+            const dayNumber = document.createElement('div');
+            dayNumber.className = 'day-number';
+            dayNumber.textContent = day.getDate();
+            dayElement.appendChild(dayNumber);
+
+            const dateKey = day.toISOString().split('T')[0];
+            const dayEvents = calendarEvents.filter(event => event.start_date === dateKey || event.due_date === dateKey);
+            if (dayEvents.length) {
+                if (dayEvents.some(event => event.type === 'task' && event.status === 'done')) {
+                    dayElement.classList.add('completed');
+                }
+
+                const eventContainer = document.createElement('div');
+                eventContainer.className = 'calendar-day-events';
+                dayEvents.slice(0, 2).forEach(event => {
+                    const pill = document.createElement('span');
+                    pill.className = `event-pill ${event.type === 'project' ? 'project' : event.status === 'done' ? 'completed' : ''}`;
+                    pill.textContent = event.title;
+                    eventContainer.appendChild(pill);
+                });
+                if (dayEvents.length > 2) {
+                    const more = document.createElement('span');
+                    more.className = 'event-pill more';
+                    more.textContent = `+${dayEvents.length - 2} more`;
+                    eventContainer.appendChild(more);
+                }
+                dayElement.appendChild(eventContainer);
+            }
+
             calendarDays.appendChild(dayElement);
         }
+    }
+
+    function renderUpcomingEvents() {
+        eventsList.innerHTML = '';
+        const upcoming = calendarEvents
+            .filter(event => {
+                const dateString = event.start_date || event.due_date;
+                return new Date(dateString) >= new Date();
+            })
+            .sort((a, b) => new Date((a.start_date || a.due_date)) - new Date((b.start_date || b.due_date)));
+
+        if (!upcoming.length) {
+            eventsList.innerHTML = '<p>No upcoming events at the moment.</p>';
+            return;
+        }
+
+        upcoming.slice(0, 10).forEach(event => {
+            const card = document.createElement('div');
+            card.className = 'event-card';
+            card.innerHTML = `
+                <div>
+                    <div class="event-name">${event.title}</div>
+                    <div class="event-date">${event.start_date || event.due_date} • ${event.type === 'project' ? 'Project' : 'Task'}${event.type === 'task' ? ` • ${event.project}` : ''}</div>
+                </div>
+                ${event.link ? `<a href="${event.link}" target="_blank" class="event-link">Open</a>` : ''}
+            `;
+            eventsList.appendChild(card);
+        });
+    }
+
+    async function loadCalendarEvents() {
+        try {
+            const response = await fetch('/calendar/events');
+            const data = await response.json();
+            if (data.success) {
+                calendarEvents = data.events || [];
+            }
+        } catch (error) {
+            console.error('Error loading calendar events:', error);
+        }
+    }
+
+    async function refreshCalendar() {
+        await loadCalendarEvents();
+        renderCalendar();
+        renderUpcomingEvents();
     }
 
     prevButton.addEventListener('click', () => {
@@ -91,6 +167,6 @@
         renderCalendar();
     });
 
-    renderCalendar();
+    refreshCalendar();
 </script>
 {% endblock %}

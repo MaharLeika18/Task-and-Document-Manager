@@ -1,4 +1,4 @@
-from .google_services import create_project_firestore, create_project_gcalendar, get_tasks_for_project_user, get_users, get_projects_for_user, update_task_status, add_task_to_project, update_project_status
+from .google_services import create_project_firestore, create_project_gcalendar, create_task_gcalendar, get_project_by_uid, get_tasks_for_project_user, get_users, get_projects_for_user, update_task_status, add_task_to_project, update_project_status
 from flask import Blueprint, render_template, redirect, session, url_for, request, jsonify
 from datetime import datetime
 
@@ -110,22 +110,38 @@ def add_task_route():
     task_name = data.get('name')
     task_priority = data.get('priority', 'medium')
     task_status = data.get('status', 'todo')
+    task_due_date = data.get('due_date')
     task_members = data.get('members', [])
     user_uid = session['uid']
 
     if not all([project_uid, task_name]):
         return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
-    # Ensure current user is included in task members if not already
     if user_uid not in task_members:
         task_members.append(user_uid)
+
+    project_id, project_data = get_project_by_uid(project_uid)
+    if not project_data:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+
+    if not task_due_date:
+        task_due_date = project_data.get('end_date')
 
     task_data = {
         'name': task_name,
         'priority': task_priority,
         'status': task_status,
-        'members': task_members
+        'due_date': task_due_date,
+        'members': task_members,
+        'event_link': '',
+        'event_id': ''
     }
+
+    if task_due_date:
+        event_data = create_task_gcalendar(task_name, project_data.get('project_name', ''), task_due_date, project_data.get('project_description', ''))
+        if event_data:
+            task_data['event_link'] = event_data.get('htmlLink', '')
+            task_data['event_id'] = event_data.get('id', '')
 
     result = add_task_to_project(project_uid, task_data, user_uid)
     return jsonify(result)

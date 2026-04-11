@@ -17,7 +17,12 @@
         </div>
         <div class="member-info">
             <h3>{{ member.name }}</h3>
-            <p>{{ member.email }}</p>
+            <p>{{ member.email or 'No email provided' }}</p>
+            <div class="member-meta">
+                <span class="badge">{{ member.projects_count }} project{{ 's' if member.projects_count != 1 }}</span>
+                <span class="badge">{{ member.tasks_count }} task{{ 's' if member.tasks_count != 1 }}</span>
+                <span class="badge badge-success">{{ member.completed_tasks_count }} completed</span>
+            </div>
         </div>
     </div>
     {% endfor %}

@@ -43,13 +43,11 @@
 
     <div class="side-bar">
         <ul class="buttons">
-            <li><a href="{{ url_for('home.home') }}" id="home">Home</a></li>
-            <li><a href="{{ url_for('projects.projects') }}" id="projects">Projects</a></li>
-            <li><a href="{{ url_for('members.members') }}" id="members">Members</a></li>
-            <li><a href="{{ url_for('calendar.calendar') }}" id="calendar">Calendar</a></li>
-            <li><a href="{{ url_for('files.files') }}" id="files">Files</a></li>
-        </ul>
-
+            <li><a href="{{ url_for('home.home') }}" id="home" class="{% if request.endpoint == 'home.home' %}active{% endif %}">Home</a></li>
+            <li><a href="{{ url_for('projects.projects') }}" id="projects" class="{% if request.endpoint == 'projects.projects' %}active{% endif %}">Projects</a></li>
+            <li><a href="{{ url_for('members.members') }}" id="members" class="{% if request.endpoint == 'members.members' %}active{% endif %}">Members</a></li>
+            <li><a href="{{ url_for('calendar.calendar') }}" id="calendar" class="{% if request.endpoint == 'calendar.calendar' %}active{% endif %}">Calendar</a></li>
+            <li><a href="{{ url_for('files.files') }}" id="files" class="{% if request.endpoint == 'files.files' %}active{% endif %}">Files</a></li>
         <div class="dailies">
             <div class="add-dailies">
                 <button id="add-daily-btn" title="Add Daily">

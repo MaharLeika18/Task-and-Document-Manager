@@ -37,8 +37,8 @@ def create_project_firestore(project_maker, project_name, project_description, a
         'priority': priority,
         'category': category,
         'calendar_link': calendar_link,
-        'start_date': datetime.strptime(start_date, '%Y-%m-%d').isoformat(),
-        'end_date': datetime.strptime(end_date, '%Y-%m-%d').isoformat()
+        'start_date': start_date,
+        'end_date': end_date
     })
     
     return {
@@ -90,6 +90,123 @@ def create_project_gcalendar(project_name, project_description, start_date, end_
         return None
 
 
+def create_task_gcalendar(task_name, project_name, due_date, description=""):
+    """
+    Create a Google Calendar event for a task.
+    Uses all-day events with an exclusive end date.
+    """
+    try:
+        service = gcalendar_service()
+        due_datetime = datetime.strptime(due_date, '%Y-%m-%d')
+        end_datetime = due_datetime + timedelta(days=1)
+        event = {
+            'summary': f'{task_name} — {project_name}',
+            'description': description or f'Task for project {project_name}',
+            'start': {
+                'date': due_date,
+                'timeZone': 'UTC',
+            },
+            'end': {
+                'date': end_datetime.strftime('%Y-%m-%d'),
+                'timeZone': 'UTC',
+            },
+        }
+        created_event = service.events().insert(calendarId=calendar_id, body=event).execute()
+        return {
+            'htmlLink': created_event.get('htmlLink'),
+            'id': created_event.get('id')
+        }
+    except HttpError as error:
+        print(f'Google Calendar API error: {error}')
+        return None
+    except ValueError as error:
+        print(f'Date parsing error: {error}')
+        return None
+    except Exception as error:
+        print(f'Unexpected error creating task calendar event: {error}')
+        return None
+
+
+def update_task_event_status(event_id, task_name, project_name, new_status):
+    try:
+        if not event_id:
+            return False
+        service = gcalendar_service()
+        base_summary = f"{task_name} — {project_name}"
+        new_summary = f"✅ {base_summary}" if new_status == 'done' else base_summary
+        service.events().patch(
+            calendarId=calendar_id,
+            eventId=event_id,
+            body={'summary': new_summary}
+        ).execute()
+        return True
+    except HttpError as error:
+        print(f'Google Calendar API error updating event: {error}')
+        return False
+    except Exception as error:
+        print(f'Unexpected error updating task calendar event: {error}')
+        return False
+
+
+def get_project_by_uid(project_uid):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+        for doc in docs:
+            project_data = doc.to_dict()
+            if project_data.get('project_uid') == project_uid:
+                return doc.id, project_data
+    except Exception as e:
+        print(f'Error fetching project by uid: {e}')
+    return None, None
+
+
+def get_user_calendar_events(user_uid):
+    events = []
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            if user_uid not in project_data.get('assigned_members', []):
+                continue
+
+            project_start = project_data.get('start_date')
+            project_end = project_data.get('end_date')
+            if project_start and project_end:
+                events.append({
+                    'id': project_data.get('project_uid'),
+                    'type': 'project',
+                    'title': project_data.get('project_name'),
+                    'description': project_data.get('project_description'),
+                    'start_date': project_start.split('T')[0] if 'T' in project_start else project_start,
+                    'end_date': project_end.split('T')[0] if 'T' in project_end else project_end,
+                    'link': project_data.get('calendar_link', ''),
+                })
+
+            for task in project_data.get('tasks', []):
+                if user_uid not in task.get('members', []):
+                    continue
+                due_date = task.get('due_date') or project_end
+                if not due_date:
+                    continue
+                events.append({
+                    'id': f"{project_data.get('project_uid')}_{task.get('name')}",
+                    'type': 'task',
+                    'title': task.get('name'),
+                    'project': project_data.get('project_name'),
+                    'due_date': due_date.split('T')[0] if 'T' in due_date else due_date,
+                    'status': task.get('status', ''),
+                    'priority': task.get('priority', ''),
+                    'link': task.get('event_link', ''),
+                })
+
+    except Exception as e:
+        print(f'Error getting calendar events: {e}')
+    return events
+
+
 def get_users():
     users = []
     try:
@@ -98,13 +215,54 @@ def get_users():
         for doc in docs:
             user_data = doc.to_dict()
             users.append({
-                'uid': user_data['uid'],
-                'name': user_data['username']
+                'uid': user_data.get('uid', ''),
+                'name': user_data.get('username', '') or user_data.get('name', ''),
+                'email': user_data.get('email', ''),
+                'picture': user_data.get('picture', ''),
+                'role': user_data.get('role', 'Member')
             })
     except Exception as e:
         print(f"An error occurred while fetching users: {e}")
     
     return users
+
+def get_member_summaries():
+    summaries = {}
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+        for doc in docs:
+            project_data = doc.to_dict()
+            assigned_members = project_data.get('assigned_members', [])
+            tasks = project_data.get('tasks', [])
+
+            for member_uid in assigned_members:
+                summary = summaries.setdefault(member_uid, {
+                    'projects_count': 0,
+                    'tasks_count': 0,
+                    'open_tasks_count': 0,
+                    'completed_tasks_count': 0
+                })
+                summary['projects_count'] += 1
+
+            for task in tasks:
+                task_members = task.get('members', [])
+                status = task.get('status', 'todo')
+                for member_uid in task_members:
+                    summary = summaries.setdefault(member_uid, {
+                        'projects_count': 0,
+                        'tasks_count': 0,
+                        'open_tasks_count': 0,
+                        'completed_tasks_count': 0
+                    })
+                    summary['tasks_count'] += 1
+                    if status == 'done':
+                        summary['completed_tasks_count'] += 1
+                    else:
+                        summary['open_tasks_count'] += 1
+    except Exception as e:
+        print(f"An error occurred while fetching member summaries: {e}")
+    return summaries
 
 def get_projects_for_user(user_uid):
     projects = []
@@ -149,12 +307,18 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
                 # Find and update the task
                 for task in tasks:
                     if task.get('name') == task_name and user_uid in task.get('members', []):
+                        old_status = task.get('status')
                         task['status'] = new_status
+                        event_id = task.get('event_id')
+                        project_name = project_data.get('project_name', '')
                         break
 
                 # Update the project document
                 doc_ref = projects_ref.document(doc.id)
                 doc_ref.update({'tasks': tasks})
+
+                if event_id and old_status != new_status:
+                    update_task_event_status(event_id, task_name, project_name, new_status)
 
                 return {'success': True, 'message': 'Task status updated successfully'}
 
