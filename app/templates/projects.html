@@ -189,6 +189,7 @@
                     <div class="summary-row"><span>Priority</span><strong id="project-priority-label"></strong></div>
                     <div class="summary-row"><span>Timeline</span><strong id="project-timeline"></strong></div>
                     <div class="summary-row"><span>Members</span><strong id="project-members-label"></strong></div>
+                    <div class="summary-row"><span>Project files</span><strong id="project-files-count">0</strong></div>
                 </div>
                 <div class="project-card-summary">
                     <h3>Progress</h3>
@@ -213,7 +214,13 @@
                     <div><strong>Due:</strong> <span id="task-detail-due"></span></div>
                     <div><strong>Assigned to:</strong> <span id="task-detail-members"></span></div>
                     <div><strong>Event:</strong> <a href="#" target="_blank" id="task-detail-link">Open in Google Calendar</a></div>
+                    <div><strong>Files:</strong> <span id="task-detail-files"></span></div>
                 </div>
+            </div>
+
+            <div class="project-card-summary" style="margin-bottom: 1.5rem;">
+                <h3>Project File References</h3>
+                <div id="project-files-list"></div>
             </div>
 
             <div class="task-view-tabs">
@@ -398,6 +405,34 @@
         } else {
             linkElement.style.display = 'none';
         }
+
+        const taskFilesElement = document.getElementById('task-detail-files');
+        const taskFiles = task.files || [];
+        if (!taskFiles.length) {
+            taskFilesElement.textContent = 'No files linked to this task yet.';
+            return;
+        }
+
+        taskFilesElement.innerHTML = taskFiles.map(file => {
+            const href = file.web_view_link || `/files/view/${file.file_id}`;
+            return `<a href="${href}" target="_blank">${file.name}</a>`;
+        }).join(' | ');
+    }
+
+    function renderProjectFiles(project) {
+        const projectFiles = project.project_files || [];
+        const listElement = document.getElementById('project-files-list');
+        document.getElementById('project-files-count').textContent = projectFiles.length;
+
+        if (!projectFiles.length) {
+            listElement.innerHTML = '<p class="empty-state">No files linked to this project yet. Use the Files tab to upload and link documents.</p>';
+            return;
+        }
+
+        listElement.innerHTML = projectFiles.map(file => {
+            const href = file.web_view_link || `/files/view/${file.file_id}`;
+            return `<p><a href="${href}" target="_blank">${file.name}</a></p>`;
+        }).join('');
     }
 
     function renderTaskCard(task, project) {
@@ -531,6 +566,7 @@
         document.getElementById('task-view-project-name').textContent = project.project_name;
         document.getElementById('task-detail-card').style.display = 'none';
         renderProjectSummary(project);
+        renderProjectFiles(project);
         renderProjectTasks(project);
         renderBacklog(project);
         renderReports(project);

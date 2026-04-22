@@ -4,3 +4,5 @@ __pycache__/
 .venv
 firebase-admin.json
 councilog-960a406ec1c5.json
+oauthCounciLog.json
+token.json

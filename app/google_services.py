@@ -1,8 +1,5 @@
 from random import random
 from flask import jsonify
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.oauth2 import service_account
@@ -13,18 +10,24 @@ from app.session_id_generation import generate_secure_string
 from .firebase_run import db, auth, verify_firebase_token
 dotenv.load_dotenv()
 
-SCOPES=["https://www.googleapis.com/auth/calendar.events.owned"]
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.events.owned"]
 
 def gcalendar_service():
     global calendar_id 
     calendar_id = os.getenv('COUNCILOG_CALENDAR_ID')
     creds = service_account.Credentials.from_service_account_file(
-        os.getenv('COUNCILOG_SERVICE_ACCOUNT_FILE'), scopes=SCOPES)
+        os.getenv('COUNCILOG_SERVICE_ACCOUNT_FILE'), scopes=CALENDAR_SCOPES)
     service = build('calendar', 'v3', credentials=creds)
     return service
 
 def create_project_firestore(project_maker, project_name, project_description, assigned_members, 
                     tasks, status, priority, category, calendar_link, start_date, end_date):
+    normalized_tasks = []
+    for task in tasks:
+        normalized_task = dict(task)
+        normalized_task.setdefault('files', [])
+        normalized_tasks.append(normalized_task)
+
     project = db.collection('projects').add({
         'project_uid': generate_secure_string(32),
         'project_maker': project_maker['name'],
@@ -32,7 +35,8 @@ def create_project_firestore(project_maker, project_name, project_description, a
         'project_name': project_name,
         'project_description': project_description,
         'assigned_members': assigned_members,
-        'tasks': tasks,
+        'tasks': normalized_tasks,
+        'project_files': [],
         'status': status, 
         'priority': priority,
         'category': category,
@@ -278,6 +282,7 @@ def get_projects_for_user(user_uid):
                     'project_description': project_data.get('project_description', ''),
                     'assigned_members': project_data.get('assigned_members', []),
                     'tasks': project_data.get('tasks', []),
+                    'project_files': project_data.get('project_files', []),
                     'priority': project_data.get('priority', ''),
                     'status': project_data.get('status', ''),
                     'category': project_data.get('category', ''),
@@ -303,6 +308,9 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
             project_data = doc.to_dict()
             if project_data.get('project_uid') == project_uid:
                 tasks = project_data.get('tasks', [])
+                event_id = None
+                old_status = None
+                task_found = False
 
                 # Find and update the task
                 for task in tasks:
@@ -311,7 +319,11 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
                         task['status'] = new_status
                         event_id = task.get('event_id')
                         project_name = project_data.get('project_name', '')
+                        task_found = True
                         break
+
+                if not task_found:
+                    return {'success': False, 'message': 'Task not found or user not authorized'}
 
                 # Update the project document
                 doc_ref = projects_ref.document(doc.id)
@@ -343,6 +355,7 @@ def add_task_to_project(project_uid, task_data, user_uid):
                 user_uid in project_data.get('assigned_members', [])):
 
                 tasks = project_data.get('tasks', [])
+                task_data.setdefault('files', [])
                 tasks.append(task_data)
 
                 # Update the project document
@@ -406,3 +419,98 @@ def update_project_status(project_uid, new_status, user_uid):
     except Exception as e:
         print(f"Error updating project status: {e}")
         return {'success': False, 'message': str(e)}
+
+
+def link_drive_file_to_project_task(project_uid, file_data, user_uid, task_name=None):
+    try:
+        file_id = file_data.get('file_id')
+        if not file_id:
+            return {'success': False, 'message': 'Missing file id'}
+
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            if project_data.get('project_uid') != project_uid:
+                continue
+
+            assigned_members = project_data.get('assigned_members', [])
+            if user_uid not in assigned_members:
+                return {'success': False, 'message': 'User not authorized for this project'}
+
+            file_reference = {
+                'file_id': file_data.get('file_id', ''),
+                'name': file_data.get('name', ''),
+                'mime_type': file_data.get('mime_type', ''),
+                'size': file_data.get('size', '0'),
+                'web_view_link': file_data.get('web_view_link', ''),
+                'web_content_link': file_data.get('web_content_link', ''),
+                'modified_time': file_data.get('modified_time', ''),
+                'linked_by': user_uid,
+                'linked_at': datetime.utcnow().isoformat() + 'Z'
+            }
+
+            doc_ref = projects_ref.document(doc.id)
+            if task_name:
+                tasks = project_data.get('tasks', [])
+                for task in tasks:
+                    if task.get('name') != task_name:
+                        continue
+
+                    if user_uid not in task.get('members', []) and user_uid not in assigned_members:
+                        return {'success': False, 'message': 'User not authorized for this task'}
+
+                    task_files = task.setdefault('files', [])
+                    if not any(existing.get('file_id') == file_id for existing in task_files):
+                        task_files.append(file_reference)
+
+                    doc_ref.update({'tasks': tasks})
+                    return {'success': True, 'message': 'File linked to task successfully'}
+
+                return {'success': False, 'message': 'Task not found'}
+
+            project_files = project_data.get('project_files', [])
+            if not any(existing.get('file_id') == file_id for existing in project_files):
+                project_files.append(file_reference)
+                doc_ref.update({'project_files': project_files})
+
+            return {'success': True, 'message': 'File linked to project successfully'}
+
+        return {'success': False, 'message': 'Project not found'}
+    except Exception as error:
+        print(f'Error linking file to project/task: {error}')
+        return {'success': False, 'message': str(error)}
+
+
+def get_project_file_references(project_uid, user_uid):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            if project_data.get('project_uid') != project_uid:
+                continue
+
+            if user_uid not in project_data.get('assigned_members', []):
+                return {'success': False, 'message': 'User not authorized for this project'}
+
+            task_files = []
+            for task in project_data.get('tasks', []):
+                if user_uid in task.get('members', []) and task.get('files'):
+                    task_files.append({
+                        'task_name': task.get('name', ''),
+                        'files': task.get('files', [])
+                    })
+
+            return {
+                'success': True,
+                'project_files': project_data.get('project_files', []),
+                'task_files': task_files
+            }
+
+        return {'success': False, 'message': 'Project not found'}
+    except Exception as error:
+        print(f'Error fetching project file references: {error}')
+        return {'success': False, 'message': str(error)}

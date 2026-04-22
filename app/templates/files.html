@@ -5,59 +5,44 @@
 {% block content %}
 <h1>Project Files</h1>
 
-<div class="files-container">
-    <div class="files-header">
+<div class="files-manager">
+    <div class="files-toolbar">
         <div class="file-actions">
-            <button id="upload-file" class="btn-primary">Upload File</button>
-            <button id="create-folder" class="btn-secondary">Create Folder</button>
+            <button id="upload-file" class="btn-primary" type="button">Upload File</button>
+            <button id="create-folder" class="btn-secondary" type="button">Create Folder</button>
+            <button id="refresh-files" class="btn-secondary" type="button">Refresh</button>
         </div>
-        <div class="file-search">
+        <div class="file-filters">
+            <select id="project-filter">
+                <option value="">No project reference</option>
+                {% for project in projects %}
+                    <option value="{{ project.project_uid }}">{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+            <select id="task-filter" disabled>
+                <option value="">Project-level file</option>
+            </select>
             <input type="text" placeholder="Search files..." id="file-search">
         </div>
     </div>
 
-    <div class="files-grid">
-        <div class="file-item folder">
-            <div class="file-icon">📁</div>
-            <div class="file-info">
-                <h4>Project Documents</h4>
-                <p>Modified 2 days ago</p>
-            </div>
-        </div>
+    <p id="files-status" class="files-status">Loading files...</p>
 
-        <div class="file-item file">
-            <div class="file-icon">📄</div>
-            <div class="file-info">
-                <h4>requirements.pdf</h4>
-                <p>2.3 MB • Modified yesterday</p>
-            </div>
-        </div>
+    <div id="files-grid" class="files-grid"></div>
 
-        <div class="file-item file">
-            <div class="file-icon">🖼️</div>
-            <div class="file-info">
-                <h4>mockup.png</h4>
-                <p>1.8 MB • Modified 3 days ago</p>
-            </div>
-        </div>
-
-        <div class="file-item file">
-            <div class="file-icon">📊</div>
-            <div class="file-info">
-                <h4>project_plan.xlsx</h4>
-                <p>456 KB • Modified 1 week ago</p>
-            </div>
-        </div>
+    <div class="file-reference-panel">
+        <h2>Referenced Files</h2>
+        <p class="reference-help">Select a project above to view files linked to the project and its tasks.</p>
+        <div id="references-list" class="references-list"></div>
     </div>
 </div>
 
-<!-- Upload Modal -->
 <div id="upload-modal" class="modal">
     <div class="modal-content">
-        <span class="close">&times;</span>
+        <span id="close-upload-modal" class="close">&times;</span>
         <h2>Upload File</h2>
         <form id="upload-form">
-            <input type="file" id="file-input" multiple>
+            <input type="file" id="file-input" multiple required>
             <button type="submit" class="btn-primary">Upload</button>
         </form>
     </div>
@@ -66,23 +51,302 @@
 
 {% block extra_js %}
 <script>
-    // File upload modal
+    const PROJECTS = {{ projects | tojson }};
+    const filesGrid = document.getElementById('files-grid');
+    const fileSearch = document.getElementById('file-search');
+    const statusEl = document.getElementById('files-status');
+    const projectFilter = document.getElementById('project-filter');
+    const taskFilter = document.getElementById('task-filter');
+    const referencesList = document.getElementById('references-list');
+
     const uploadModal = document.getElementById('upload-modal');
     const uploadBtn = document.getElementById('upload-file');
-    const closeBtn = document.querySelector('.close');
+    const closeUploadModalBtn = document.getElementById('close-upload-modal');
+    const uploadForm = document.getElementById('upload-form');
+    const fileInput = document.getElementById('file-input');
 
-    uploadBtn.onclick = function() {
-        uploadModal.style.display = 'block';
+    let allFiles = [];
+
+    function formatBytes(bytes) {
+        const num = Number(bytes || 0);
+        if (!num) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.min(Math.floor(Math.log(num) / Math.log(1024)), units.length - 1);
+        const value = num / Math.pow(1024, i);
+        return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
     }
 
-    closeBtn.onclick = function() {
-        uploadModal.style.display = 'none';
+    function iconForFile(file) {
+        if (file.is_folder) return 'FOLDER';
+        if ((file.mime_type || '').includes('image/')) return 'IMAGE';
+        if ((file.mime_type || '').includes('pdf')) return 'PDF';
+        if ((file.mime_type || '').includes('spreadsheet') || (file.name || '').endsWith('.xlsx')) return 'SHEET';
+        if ((file.mime_type || '').includes('wordprocessingml') || (file.name || '').endsWith('.docx')) return 'DOC';
+        return 'FILE';
     }
 
-    window.onclick = function(event) {
-        if (event.target == uploadModal) {
-            uploadModal.style.display = 'none';
+    function getSelectedProjectUid() {
+        return projectFilter.value || '';
+    }
+
+    function getSelectedTaskName() {
+        return taskFilter.disabled ? '' : (taskFilter.value || '');
+    }
+
+    function buildTaskOptions(projectUid) {
+        taskFilter.innerHTML = '<option value="">Project-level file</option>';
+        if (!projectUid) {
+            taskFilter.disabled = true;
+            return;
+        }
+
+        const selectedProject = PROJECTS.find(project => project.project_uid === projectUid);
+        const tasks = selectedProject ? (selectedProject.tasks || []) : [];
+
+        tasks.forEach(task => {
+            const option = document.createElement('option');
+            option.value = task.name;
+            option.textContent = task.name;
+            taskFilter.appendChild(option);
+        });
+
+        taskFilter.disabled = false;
+    }
+
+    function fileCard(file) {
+        const card = document.createElement('div');
+        card.className = `file-item ${file.is_folder ? 'folder' : 'file'}`;
+
+        const modifiedText = file.modified_time ? new Date(file.modified_time).toLocaleString() : 'Unknown date';
+        const sizeText = file.is_folder ? 'Folder' : formatBytes(file.size);
+
+        card.innerHTML = `
+            <div class="file-icon">${iconForFile(file)}</div>
+            <div class="file-info">
+                <h4>${file.name}</h4>
+                <p>${sizeText} • ${modifiedText}</p>
+            </div>
+            <div class="file-actions-inline">
+                ${!file.is_folder ? `<a href="/files/view/${file.file_id}" target="_blank" class="action-link">View</a>` : ''}
+                ${!file.is_folder ? `<a href="/files/download/${file.file_id}" class="action-link">Download</a>` : ''}
+                ${!file.is_folder ? `<button type="button" class="action-link" data-link-file-id="${file.file_id}">Link</button>` : ''}
+            </div>
+        `;
+
+        const linkButton = card.querySelector('button[data-link-file-id]');
+        if (linkButton) {
+            linkButton.addEventListener('click', () => linkExistingFile(file.file_id));
+        }
+
+        return card;
+    }
+
+    function renderFiles(fileList) {
+        filesGrid.innerHTML = '';
+        if (!fileList.length) {
+            filesGrid.innerHTML = '<p class="empty-state">No files in the configured Drive folder yet.</p>';
+            return;
+        }
+
+        fileList.forEach(file => filesGrid.appendChild(fileCard(file)));
+    }
+
+    function renderReferences(payload) {
+        referencesList.innerHTML = '';
+        if (!payload || !payload.success) {
+            referencesList.innerHTML = '<p class="empty-state">No project selected.</p>';
+            return;
+        }
+
+        const projectFiles = payload.project_files || [];
+        const taskFiles = payload.task_files || [];
+
+        const blocks = [];
+        if (projectFiles.length) {
+            blocks.push(`
+                <div class="reference-block">
+                    <h3>Project Files</h3>
+                    <ul>${projectFiles.map(file => `<li><a href="/files/view/${file.file_id}" target="_blank">${file.name}</a></li>`).join('')}</ul>
+                </div>
+            `);
+        }
+
+        taskFiles.forEach(task => {
+            blocks.push(`
+                <div class="reference-block">
+                    <h3>${task.task_name}</h3>
+                    <ul>${(task.files || []).map(file => `<li><a href="/files/view/${file.file_id}" target="_blank">${file.name}</a></li>`).join('')}</ul>
+                </div>
+            `);
+        });
+
+        if (!blocks.length) {
+            referencesList.innerHTML = '<p class="empty-state">No files linked to this project or your assigned tasks yet.</p>';
+            return;
+        }
+
+        referencesList.innerHTML = blocks.join('');
+    }
+
+    async function loadFiles() {
+        statusEl.textContent = 'Loading files...';
+        try {
+            const projectUid = getSelectedProjectUid();
+            const response = await fetch(`/files/api/list${projectUid ? `?project_uid=${encodeURIComponent(projectUid)}` : ''}`);
+            const data = await response.json();
+            if (!data.success) {
+                statusEl.textContent = data.message || 'Could not load files.';
+                return;
+            }
+
+            allFiles = data.items || [];
+            statusEl.textContent = `${allFiles.length} item(s) loaded from Google Drive.`;
+            applySearch();
+            renderReferences(data.references);
+        } catch (error) {
+            console.error(error);
+            statusEl.textContent = 'Error loading files. Check Drive credentials and folder access.';
         }
     }
+
+    function applySearch() {
+        const query = fileSearch.value.toLowerCase().trim();
+        if (!query) {
+            renderFiles(allFiles);
+            return;
+        }
+        const filtered = allFiles.filter(file => (file.name || '').toLowerCase().includes(query));
+        renderFiles(filtered);
+    }
+
+    async function linkExistingFile(fileId) {
+        const projectUid = getSelectedProjectUid();
+        const taskName = getSelectedTaskName();
+
+        if (!projectUid) {
+            alert('Select a project first to link this file.');
+            return;
+        }
+
+        const payload = {
+            file_id: fileId,
+            project_uid: projectUid,
+            task_name: taskName || null,
+        };
+
+        const response = await fetch('/files/api/link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+
+        if (!data.success) {
+            alert(data.message || 'Unable to link file.');
+            return;
+        }
+
+        await loadReferencesOnly();
+        alert(taskName ? 'File linked to task successfully.' : 'File linked to project successfully.');
+    }
+
+    async function loadReferencesOnly() {
+        const projectUid = getSelectedProjectUid();
+        if (!projectUid) {
+            renderReferences(null);
+            return;
+        }
+        const response = await fetch(`/files/api/project_refs/${encodeURIComponent(projectUid)}`);
+        const data = await response.json();
+        renderReferences(data);
+    }
+
+    async function uploadFiles(event) {
+        event.preventDefault();
+        const files = Array.from(fileInput.files || []);
+        if (!files.length) {
+            alert('Select at least one file to upload.');
+            return;
+        }
+
+        const projectUid = getSelectedProjectUid();
+        const taskName = getSelectedTaskName();
+        statusEl.textContent = 'Uploading files...';
+
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append('file', file);
+            if (projectUid) {
+                formData.append('project_uid', projectUid);
+            }
+            if (taskName) {
+                formData.append('task_name', taskName);
+            }
+
+            const response = await fetch('/files/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+                alert(data.message || `Upload failed for ${file.name}`);
+            }
+        }
+
+        uploadModal.style.display = 'none';
+        fileInput.value = '';
+        await loadFiles();
+    }
+
+    async function createFolder() {
+        const name = prompt('Folder name');
+        if (!name || !name.trim()) {
+            return;
+        }
+
+        const response = await fetch('/files/api/create_folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim() })
+        });
+        const data = await response.json();
+
+        if (!data.success) {
+            alert(data.message || 'Could not create folder.');
+            return;
+        }
+
+        await loadFiles();
+    }
+
+    uploadBtn.addEventListener('click', () => {
+        uploadModal.style.display = 'block';
+    });
+
+    closeUploadModalBtn.addEventListener('click', () => {
+        uploadModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', event => {
+        if (event.target === uploadModal) {
+            uploadModal.style.display = 'none';
+        }
+    });
+
+    document.getElementById('refresh-files').addEventListener('click', loadFiles);
+    document.getElementById('create-folder').addEventListener('click', createFolder);
+    uploadForm.addEventListener('submit', uploadFiles);
+    fileSearch.addEventListener('input', applySearch);
+
+    projectFilter.addEventListener('change', async () => {
+        buildTaskOptions(projectFilter.value);
+        await loadFiles();
+    });
+
+    taskFilter.addEventListener('change', loadReferencesOnly);
+
+    buildTaskOptions(projectFilter.value);
+    loadFiles();
 </script>
 {% endblock %}

@@ -54,6 +54,7 @@ def create_project():
                 "priority": request.form[f"tasks[{i}][priority]"],
                 "status": request.form[f"tasks[{i}][status]"],
                 "members": request.form.getlist(f"tasks[{i}][members]"),
+                "files": [],
             })
             i += 1
 
@@ -133,6 +134,7 @@ def add_task_route():
         'status': task_status,
         'due_date': task_due_date,
         'members': task_members,
+        'files': [],
         'event_link': '',
         'event_id': ''
     }
