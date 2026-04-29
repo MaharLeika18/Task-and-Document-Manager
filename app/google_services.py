@@ -22,14 +22,30 @@ def gcalendar_service():
 
 def create_project_firestore(project_maker, project_name, project_description, assigned_members, 
                     tasks, status, priority, category, calendar_link, start_date, end_date):
+    from .google_drive_services import create_project_folder
+    
     normalized_tasks = []
     for task in tasks:
         normalized_task = dict(task)
         normalized_task.setdefault('files', [])
         normalized_tasks.append(normalized_task)
 
+    # Generate project UID first
+    project_uid = generate_secure_string(32)
+    
+    # Create Google Drive folder for this project
+    folder_result = create_project_folder(project_name, project_uid)
+    drive_folder_id = None
+    drive_folder_link = None
+    
+    if folder_result.get('success'):
+        drive_folder_id = folder_result.get('folder_id')
+        drive_folder_link = folder_result.get('web_view_link')
+    else:
+        print(f'Warning: Could not create Drive folder for project {project_name}: {folder_result.get("message")}')
+    
     project = db.collection('projects').add({
-        'project_uid': generate_secure_string(32),
+        'project_uid': project_uid,
         'project_maker': project_maker['name'],
         'project_maker_uid': project_maker['uid'],
         'project_name': project_name,
@@ -42,12 +58,16 @@ def create_project_firestore(project_maker, project_name, project_description, a
         'category': category,
         'calendar_link': calendar_link,
         'start_date': start_date,
-        'end_date': end_date
+        'end_date': end_date,
+        'drive_folder_id': drive_folder_id,
+        'drive_folder_link': drive_folder_link
     })
     
     return {
         'success': True,
-        'project_id': project[1].id
+        'project_id': project[1].id,
+        'project_uid': project_uid,
+        'drive_folder_id': drive_folder_id
     }
 
 def create_project_gcalendar(project_name, project_description, start_date, end_date):
@@ -288,7 +308,9 @@ def get_projects_for_user(user_uid):
                     'category': project_data.get('category', ''),
                     'calendar_link': project_data.get('calendar_link', ''),
                     'start_date': project_data.get('start_date', ''),
-                    'end_date': project_data.get('end_date', '')
+                    'end_date': project_data.get('end_date', ''),
+                    'drive_folder_id': project_data.get('drive_folder_id', ''),
+                    'drive_folder_link': project_data.get('drive_folder_link', '')
                 })
     except Exception as e:
         print(f"An error occurred while fetching projects: {e}")

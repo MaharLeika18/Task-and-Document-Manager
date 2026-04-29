@@ -113,6 +113,43 @@ def list_drive_items(folder_id=None):
         return []
 
 
+def create_project_folder(project_name, project_uid):
+    """Create a dedicated Google Drive folder for a project."""
+    try:
+        service = gdrive_service()
+        parent_folder = os.getenv('COUNCILOG_GDRIVE_FOLDER_ID')
+        
+        if not parent_folder:
+            return {
+                'success': False,
+                'message': 'No root Drive folder configured'
+            }
+        
+        # Create folder with project name and UID for uniqueness
+        folder_name = f"{project_name} ({project_uid[:8]})"
+        metadata = {
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [parent_folder]
+        }
+        
+        created = service.files().create(
+            body=metadata,
+            fields='id,name,webViewLink'
+        ).execute()
+        
+        return {
+            'success': True,
+            'folder_id': created.get('id'),
+            'folder_name': created.get('name'),
+            'web_view_link': created.get('webViewLink')
+        }
+    except Exception as error:
+        print(f'Error creating project folder: {error}')
+        return {
+            'success': False,
+            'message': str(error)
+        }
 def create_drive_folder(name, parent_folder_id=None):
     try:
         service = gdrive_service()

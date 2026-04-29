@@ -45,6 +45,12 @@ def list_files_route():
     project_uid = request.args.get('project_uid')
     user_uid = session['uid']
 
+    # If project_uid provided and no explicit folder_id, use project's dedicated folder
+    if project_uid and not folder_id:
+        doc_id, project_data = get_project_by_uid(project_uid)
+        if project_data and project_data.get('drive_folder_id'):
+            folder_id = project_data.get('drive_folder_id')
+
     items = list_drive_items(folder_id)
     references = None
     if project_uid:
@@ -60,9 +66,17 @@ def create_folder_route():
     data = request.json or {}
     name = (data.get('name') or '').strip()
     parent_folder_id = data.get('parent_folder_id')
+    project_uid = data.get('project_uid')
 
     if not name:
         return jsonify({'success': False, 'message': 'Folder name is required'}), 400
+
+    # If project_uid provided and no explicit parent, use project's folder
+    if project_uid and not parent_folder_id:
+        from .google_services import get_project_by_uid
+        doc_id, project_data = get_project_by_uid(project_uid)
+        if project_data and project_data.get('drive_folder_id'):
+            parent_folder_id = project_data.get('drive_folder_id')
 
     result = create_drive_folder(name, parent_folder_id)
     return jsonify(result), 200 if result.get('success') else 500
@@ -79,6 +93,13 @@ def upload_file_route():
     project_uid = request.form.get('project_uid')
     task_name = request.form.get('task_name') or None
     user_uid = session['uid']
+
+    # If project_uid provided and no explicit folder_id, get the project's dedicated folder
+    if project_uid and not folder_id:
+        from .google_services import get_project_by_uid
+        doc_id, project_data = get_project_by_uid(project_uid)
+        if project_data and project_data.get('drive_folder_id'):
+            folder_id = project_data.get('drive_folder_id')
 
     upload_result = upload_file_to_drive(file_storage, folder_id)
     if not upload_result.get('success'):
@@ -148,11 +169,18 @@ def view_file_route(file_id):
     web_view_link = file_data.get('web_view_link')
     web_content_link = file_data.get('web_content_link')
     
+    # For images, show in lightbox viewer
+    if mime_type.startswith('image/'):
+        return render_template('image_viewer.html', 
+                             file_id=file_id, 
+                             file_name=file_data.get('name', 'Image'),
+                             web_content_link=web_content_link,
+                             file_data=file_data)
     # For Google Docs/Sheets/Slides, use webViewLink
-    if 'google-apps' in mime_type:
+    elif 'google-apps' in mime_type:
         target = web_view_link
-    # For PDF and images, try webContentLink first, then webViewLink
-    elif mime_type in ['application/pdf'] or mime_type.startswith('image/'):
+    # For PDF, try webContentLink first, then webViewLink
+    elif mime_type in ['application/pdf']:
         target = web_content_link or web_view_link
     # For Office documents, embed them in an iframe via Google Viewer
     elif any(fmt in mime_type for fmt in ['word', 'spreadsheet', 'presentation']) or \

@@ -3,37 +3,46 @@
 {% block title %}Files{% endblock %}
 
 {% block content %}
-<h1>Project Files</h1>
-
-<div class="files-manager">
-    <div class="files-toolbar">
-        <div class="file-actions">
-            <button id="upload-file" class="btn-primary" type="button">Upload File</button>
-            <button id="create-folder" class="btn-secondary" type="button">Create Folder</button>
-            <button id="refresh-files" class="btn-secondary" type="button">Refresh</button>
-        </div>
-        <div class="file-filters">
-            <select id="project-filter">
-                <option value="">No project reference</option>
-                {% for project in projects %}
-                    <option value="{{ project.project_uid }}">{{ project.project_name }}</option>
-                {% endfor %}
-            </select>
-            <select id="task-filter" disabled>
-                <option value="">Project-level file</option>
-            </select>
-            <input type="text" placeholder="Search files..." id="file-search">
-        </div>
+<div class="files-page">
+    <div class="page-header">
+        <h1>Project Files</h1>
     </div>
 
-    <p id="files-status" class="files-status">Loading files...</p>
+    <div class="files-manager">
+        <div class="files-toolbar">
+            <div class="file-actions">
+                <button id="upload-file" class="btn-primary" type="button">⬆️ Upload File</button>
+                <button id="create-folder" class="btn-secondary" type="button">📁 Create Folder</button>
+                <button id="refresh-files" class="btn-secondary" type="button">🔄 Refresh</button>
+            </div>
+            <div class="file-filters">
+                <select id="project-filter">
+                    <option value="">No project reference</option>
+                    {% for project in projects %}
+                        <option value="{{ project.project_uid }}">{{ project.project_name }}</option>
+                    {% endfor %}
+                </select>
+                <select id="task-filter" disabled>
+                    <option value="">Project-level file</option>
+                </select>
+                <input type="text" placeholder="Search files..." id="file-search">
+            </div>
+        </div>
 
-    <div id="files-grid" class="files-grid"></div>
+        <div class="files-content-area">
+            <div class="files-main">
+                <p id="files-status" class="files-status">Loading files...</p>
+                <div id="files-grid" class="files-grid"></div>
+            </div>
 
-    <div class="file-reference-panel">
-        <h2>Referenced Files</h2>
-        <p class="reference-help">Select a project above to view files linked to the project and its tasks.</p>
-        <div id="references-list" class="references-list"></div>
+            <div class="file-reference-panel">
+                <div class="reference-header">
+                    <h3>📎 Referenced Files</h3>
+                </div>
+                <p class="reference-help">Select a project above to view files linked to the project and its tasks.</p>
+                <div id="references-list" class="references-list"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -47,6 +56,292 @@
         </form>
     </div>
 </div>
+
+<style>
+    .files-page {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    
+    .page-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .page-header h1 {
+        font-size: 1.8rem;
+        color: #333;
+        margin: 0;
+    }
+    
+    .files-manager {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        flex: 1;
+        min-height: 0;
+    }
+    
+    .files-toolbar {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .file-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .file-filters {
+        display: flex;
+        gap: 0.75rem;
+        flex: 1;
+        min-width: 300px;
+        flex-wrap: wrap;
+    }
+    
+    .file-filters select,
+    .file-filters input {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-family: inherit;
+    }
+    
+    .file-filters input {
+        flex: 1;
+        min-width: 150px;
+    }
+    
+    .file-filters select:focus,
+    .file-filters input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .files-content-area {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1rem;
+        flex: 1;
+        min-height: 0;
+    }
+    
+    .files-main {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .files-status {
+        text-align: center;
+        color: #666;
+        padding: 1rem;
+        font-size: 0.95rem;
+    }
+    
+    .files-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+        flex: 1;
+    }
+    
+    .file-item {
+        background: #f9f9f9;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        transition: all 0.2s;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .file-item:hover {
+        background: white;
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        transform: translateY(-2px);
+    }
+    
+    .file-icon {
+        font-size: 2rem;
+        line-height: 1;
+    }
+    
+    .file-info h4 {
+        margin: 0.5rem 0 0;
+        font-size: 0.9rem;
+        word-break: break-word;
+        color: #333;
+    }
+    
+    .file-info p {
+        margin: 0.25rem 0 0;
+        font-size: 0.75rem;
+        color: #999;
+    }
+    
+    .file-actions-inline {
+        display: flex;
+        gap: 0.25rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 0.5rem;
+    }
+    
+    .action-link {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+    
+    .action-link:hover {
+        background: #5a67d8;
+    }
+    
+    .file-reference-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .reference-header {
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #f0f0f0;
+        padding-bottom: 0.5rem;
+    }
+    
+    .reference-header h3 {
+        margin: 0;
+        font-size: 1rem;
+        color: #333;
+    }
+    
+    .reference-help {
+        font-size: 0.85rem;
+        color: #999;
+        margin: 0 0 1rem 0;
+        font-style: italic;
+    }
+    
+    .references-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+    
+    .reference-block {
+        margin-bottom: 1rem;
+    }
+    
+    .reference-block h3 {
+        font-size: 0.95rem;
+        color: #667eea;
+        margin: 0 0 0.5rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .reference-file-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .reference-file-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #f5f5f5;
+    }
+    
+    .reference-file-list li:last-child {
+        border-bottom: none;
+    }
+    
+    .file-icon {
+        display: inline-block;
+        min-width: 20px;
+        text-align: center;
+    }
+    
+    .reference-file-list a {
+        flex: 1;
+        color: #667eea;
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .reference-file-list a:hover {
+        text-decoration: underline;
+    }
+    
+    .file-size {
+        font-size: 0.8rem;
+        color: #999;
+        white-space: nowrap;
+    }
+    
+    .empty-state {
+        text-align: center;
+        color: #999;
+        padding: 2rem 1rem;
+    }
+    
+    @media (max-width: 1024px) {
+        .files-content-area {
+            grid-template-columns: 1fr;
+        }
+        
+        .file-reference-panel {
+            max-height: 300px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .files-toolbar {
+            flex-direction: column;
+        }
+        
+        .file-filters {
+            flex-direction: column;
+        }
+        
+        .files-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        }
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}
