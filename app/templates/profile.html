@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<style>
+    .profile-page {
+        display: grid;
+        grid-template-columns: minmax(280px, 360px) 1fr;
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    .profile-card,
+    .profile-panel {
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(102, 126, 234, 0.12);
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(52, 63, 120, 0.08);
+        overflow: hidden;
+    }
+
+    .profile-card {
+        padding: 1.5rem;
+        position: sticky;
+        top: 1rem;
+    }
+
+    .profile-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .profile-avatar {
+        width: 132px;
+        height: 132px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3rem;
+        font-weight: 700;
+        box-shadow: 0 18px 40px rgba(102, 126, 234, 0.35);
+    }
+
+    .profile-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .profile-name {
+        margin: 0;
+        font-size: 1.8rem;
+        color: #1f2937;
+    }
+
+    .profile-email {
+        margin: 0;
+        color: #6b7280;
+    }
+
+    .profile-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 0.25rem;
+    }
+
+    .profile-pill {
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .profile-panel {
+        padding: 1.5rem;
+    }
+
+    .section-title {
+        margin: 0 0 1rem 0;
+        font-size: 1.2rem;
+        color: #111827;
+    }
+
+    .profile-form {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .field-group {
+        display: grid;
+        gap: 0.45rem;
+    }
+
+    .field-group label {
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .field-group input[type="text"],
+    .field-group input[type="url"],
+    .field-group input[type="file"] {
+        padding: 0.9rem 1rem;
+        border-radius: 12px;
+        border: 1px solid #d1d5db;
+        font-size: 1rem;
+        font-family: inherit;
+        background: #fff;
+    }
+
+    .field-group input[type="text"]:focus,
+    .field-group input[type="url"]:focus,
+    .field-group input[type="file"]:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+    }
+
+    .file-preview {
+        margin: 0.5rem 0;
+        padding: 0.75rem 1rem;
+        background: #f0f4ff;
+        border-radius: 12px;
+        border: 1px dashed #667eea;
+        text-align: center;
+        color: #667eea;
+        font-size: 0.9rem;
+    }
+
+    .file-preview.error {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #b91c1c;
+    }
+
+    .help-text {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #6b7280;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-top: 0.25rem;
+    }
+
+    .btn-action {
+        border: none;
+        border-radius: 999px;
+        padding: 0.9rem 1.2rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    .btn-action:hover {
+        transform: translateY(-1px);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea, #4f46e5);
+        color: white;
+        box-shadow: 0 12px 24px rgba(79, 70, 229, 0.18);
+    }
+
+    .btn-secondary {
+        background: #e5edff;
+        color: #1d4ed8;
+    }
+
+    .btn-danger {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin: 1rem 0 1.25rem;
+    }
+
+    .info-card {
+        padding: 1rem;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+    }
+
+    .info-card span {
+        display: block;
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-bottom: 0.25rem;
+    }
+
+    .info-card strong {
+        font-size: 1.15rem;
+        color: #111827;
+    }
+
+    .project-list {
+        display: grid;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .project-item {
+        padding: 0.9rem 1rem;
+        border-radius: 14px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+    }
+
+    .project-item h4 {
+        margin: 0 0 0.3rem 0;
+        color: #111827;
+    }
+
+    .project-item p {
+        margin: 0;
+        color: #6b7280;
+        font-size: 0.92rem;
+    }
+
+    .flash-list {
+        display: grid;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .flash-message {
+        padding: 0.85rem 1rem;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        font-weight: 600;
+    }
+
+    .flash-success {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        color: #047857;
+    }
+
+    .flash-error {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #b91c1c;
+    }
+
+    @media (max-width: 900px) {
+        .profile-page {
+            grid-template-columns: 1fr;
+        }
+
+        .profile-card {
+            position: static;
+        }
+
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="profile-page">
+    <section class="profile-card">
+        <div class="profile-hero">
+            <div class="profile-avatar">
+                {% if profile.picture %}
+                    <img src="{{ profile.picture }}" alt="{{ profile.name }}">
+                {% else %}
+                    <span>{{ (profile.name or user.name)[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <div>
+                <h1 class="profile-name">{{ profile.name or user.name }}</h1>
+                <p class="profile-email">{{ profile.email or user.email }}</p>
+            </div>
+            <div class="profile-badges">
+                <span class="profile-pill">{{ profile.role }}</span>
+                <span class="profile-pill">{{ project_count }} project{{ 's' if project_count != 1 }}</span>
+                <span class="profile-pill">{{ task_count }} task{{ 's' if task_count != 1 }}</span>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-card">
+                <span>Account Type</span>
+                <strong>{{ profile.photo_source|title }} Photo</strong>
+            </div>
+            <div class="info-card">
+                <span>Member Since</span>
+                <strong>{{ profile.date_created or 'Unknown' }}</strong>
+            </div>
+            <div class="info-card">
+                <span>User ID</span>
+                <strong style="word-break:break-all;">{{ profile.uid }}</strong>
+            </div>
+        </div>
+
+        <p class="help-text">Use the form to update your display name or replace your photo with your Google avatar or a custom image URL.</p>
+    </section>
+
+    <section class="profile-panel">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-list">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category if category in ['success', 'error'] else 'success' }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <h2 class="section-title">Edit Profile</h2>
+
+        <form class="profile-form" method="POST" action="{{ url_for('members.profile') }}" enctype="multipart/form-data">
+            <div class="field-group">
+                <label for="display_name">Display Name</label>
+                <input id="display_name" name="display_name" type="text" value="{{ profile.display_name or profile.name }}" placeholder="Your display name">
+            </div>
+
+            <div class="field-group">
+                <label for="picture_url">Profile Photo URL</label>
+                <input id="picture_url" name="picture_url" type="url" value="{{ profile.picture }}" placeholder="https://example.com/avatar.png">
+                <p class="help-text">If you want to use your Google account photo, click the button below. A blank field will show initials on the members page.</p>
+            </div>
+
+            <div class="field-group">
+                <label for="profile_photo">Upload Profile Photo</label>
+                <input id="profile_photo" name="profile_photo" type="file" accept="image/*">
+                <p class="help-text">Upload an image file to use as your profile photo. Supported formats: JPG, PNG, GIF, WebP.</p>
+                <div id="file-preview" class="file-preview" style="display:none;"></div>
+            </div>
+
+            <div class="button-row">
+                <button class="btn-action btn-primary" type="submit" name="photo_action" value="save">Save Changes</button>
+                <button class="btn-action btn-secondary" type="submit" name="photo_action" value="google">Use Google Photo</button>
+            </div>
+        </form>
+
+        <script>
+            const fileInput = document.getElementById('profile_photo');
+            const filePreview = document.getElementById('file-preview');
+            
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const file = this.files[0];
+                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    
+                    if (file.size > maxSize) {
+                        filePreview.textContent = '❌ File too large. Maximum size: 5MB';
+                        filePreview.classList.add('error');
+                        filePreview.style.display = 'block';
+                        fileInput.value = '';
+                    } else if (!file.type.startsWith('image/')) {
+                        filePreview.textContent = '❌ Please select an image file.';
+                        filePreview.classList.add('error');
+                        filePreview.style.display = 'block';
+                        fileInput.value = '';
+                    } else {
+                        filePreview.textContent = '✓ ' + file.name + ' (' + (file.size / 1024).toFixed(2) + ' KB)';
+                        filePreview.classList.remove('error');
+                        filePreview.style.display = 'block';
+                    }
+                } else {
+                    filePreview.style.display = 'none';
+                }
+            });
+        </script>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e5e7eb;">
+
+        <h2 class="section-title">Your Projects</h2>
+        {% if projects %}
+            <div class="project-list">
+                {% for project in projects %}
+                    <div class="project-item">
+                        <h4>{{ project.project_name }}</h4>
+                        <p>{{ project.project_description or 'No description provided.' }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="help-text">You are not assigned to any projects yet.</p>
+        {% endif %}
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e5e7eb;">
+
+        <h2 class="section-title">Danger Zone</h2>
+        <p class="help-text">Deleting your account removes your user record, removes you from project assignments, and deletes the linked Firebase Auth account.</p>
+        <form method="POST" action="{{ url_for('members.profile_delete') }}" onsubmit="return confirm('Delete your account permanently? This cannot be undone.');">
+            <button class="btn-action btn-danger" type="submit">Delete My Account</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

@@ -41,9 +41,21 @@ def login():
                 'display_name': decoded_token.get("name") or "User",
                 'email': decoded_token.get("email"),
                 'date_created': datetime.now().strftime('%m/%d/%Y'),
-                'picture': decoded_token.get("picture", '')
+                'picture': decoded_token.get("picture", ''),
+                'photo_source': 'google'
             }
             user_ref.set(user_data)
+        else:
+            user_data = user_doc.to_dict() or {}
+            updates = {}
+            if decoded_token.get("picture") and user_data.get('photo_source', 'google') == 'google' and user_data.get('picture') != decoded_token.get("picture"):
+                updates['picture'] = decoded_token.get("picture")
+            if decoded_token.get("name") and not user_data.get('display_name'):
+                updates['display_name'] = decoded_token.get("name")
+            if decoded_token.get("name") and not user_data.get('username'):
+                updates['username'] = decoded_token.get("name")
+            if updates:
+                user_ref.update(updates)
         
         print(decoded_token)
         return jsonify(success=True, uid=uid, name=decoded_token.get("name"))

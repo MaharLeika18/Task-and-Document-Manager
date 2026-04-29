@@ -52,6 +52,7 @@ def gdrive_service():
 def _serialize_drive_item(item):
     mime_type = item.get('mimeType', '')
     file_name = item.get('name', '')
+    parents = item.get('parents', []) or []
     
     return {
         'file_id': item.get('id', ''),
@@ -62,6 +63,7 @@ def _serialize_drive_item(item):
         'web_view_link': item.get('webViewLink', ''),
         'web_content_link': item.get('webContentLink', ''),
         'icon_link': item.get('iconLink', ''),
+        'parent_id': parents[0] if parents else '',
         'is_folder': mime_type == 'application/vnd.google-apps.folder',
         'is_exportable': _is_exportable_format(mime_type, file_name)
     }
@@ -102,7 +104,7 @@ def list_drive_items(folder_id=None):
         query = f"'{parent_folder}' in parents and trashed = false"
         response = service.files().list(
             q=query,
-            fields='files(id,name,mimeType,size,modifiedTime,webViewLink,webContentLink,iconLink)',
+            fields='files(id,name,mimeType,size,modifiedTime,webViewLink,webContentLink,iconLink,parents)',
             pageSize=200,
             orderBy='folder,name'
         ).execute()
@@ -222,7 +224,7 @@ def get_drive_file_metadata(file_id):
         service = gdrive_service()
         data = service.files().get(
             fileId=file_id,
-            fields='id,name,mimeType,size,modifiedTime,webViewLink,webContentLink,iconLink'
+            fields='id,name,mimeType,size,modifiedTime,webViewLink,webContentLink,iconLink,parents'
         ).execute()
         return {
             'success': True,
@@ -230,6 +232,77 @@ def get_drive_file_metadata(file_id):
         }
     except Exception as error:
         print(f'Error fetching Google Drive file metadata: {error}')
+        return {
+            'success': False,
+            'message': str(error)
+        }
+
+
+def get_drive_folder_metadata(folder_id):
+    try:
+        service = gdrive_service()
+        data = service.files().get(
+            fileId=folder_id,
+            fields='id,name,mimeType,parents'
+        ).execute()
+        return {
+            'success': True,
+            'folder': _serialize_drive_item(data)
+        }
+    except Exception as error:
+        print(f'Error fetching Google Drive folder metadata: {error}')
+        return {
+            'success': False,
+            'message': str(error)
+        }
+
+
+def delete_drive_item(file_id):
+    try:
+        service = gdrive_service()
+        service.files().update(
+            fileId=file_id,
+            body={'trashed': True}
+        ).execute()
+        return {
+            'success': True,
+            'message': 'Item moved to trash successfully'
+        }
+    except Exception as error:
+        print(f'Error deleting Google Drive item: {error}')
+        return {
+            'success': False,
+            'message': str(error)
+        }
+
+
+def stream_drive_file(file_id, export_mime=None):
+    try:
+        service = gdrive_service()
+        metadata = service.files().get(fileId=file_id, fields='id,name,mimeType').execute()
+        mime_type = metadata.get('mimeType', 'application/octet-stream')
+
+        if export_mime and mime_type.startswith('application/vnd.google-apps'):
+            request = service.files().export_media(fileId=file_id, mimeType=export_mime)
+            mime_type = export_mime
+        else:
+            request = service.files().get_media(fileId=file_id)
+
+        output = io.BytesIO()
+        downloader = MediaIoBaseDownload(output, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        output.seek(0)
+        return {
+            'success': True,
+            'file_obj': output,
+            'filename': metadata.get('name', 'downloaded-file'),
+            'mime_type': mime_type
+        }
+    except Exception as error:
+        print(f'Error streaming Google Drive file: {error}')
         return {
             'success': False,
             'message': str(error)
@@ -257,6 +330,69 @@ def download_drive_file(file_id):
         }
     except Exception as error:
         print(f'Error downloading Google Drive file: {error}')
+        return {
+            'success': False,
+            'message': str(error)
+        }
+
+
+def upload_profile_photo_to_drive(file_storage, user_uid):
+    """Upload a profile photo to Google Drive and return the file ID."""
+    try:
+        if not file_storage or not file_storage.filename:
+            return {
+                'success': False,
+                'message': 'No file selected'
+            }
+
+        # Validate that it's an image file
+        if file_storage.mimetype and not file_storage.mimetype.startswith('image/'):
+            return {
+                'success': False,
+                'message': 'Only image files are allowed'
+            }
+
+        service = gdrive_service()
+        profile_photos_folder_id = os.getenv('PROFILE_PHOTOS_FOLDER_ID')
+        
+        if not profile_photos_folder_id:
+            # Create profile photos folder if it doesn't exist
+            parent_folder = os.getenv('COUNCILOG_GDRIVE_FOLDER_ID')
+            folder_result = create_drive_folder('Profile Photos', parent_folder)
+            if not folder_result.get('success'):
+                return {
+                    'success': False,
+                    'message': 'Could not create profile photos folder'
+                }
+            profile_photos_folder_id = folder_result['folder']['id']
+        
+        # Create user-specific folder or use user_uid as part of filename
+        filename = f"{user_uid}_{file_storage.filename}"
+        
+        file_storage.stream.seek(0)
+        media = MediaIoBaseUpload(
+            file_storage.stream,
+            mimetype=file_storage.mimetype or 'application/octet-stream',
+            resumable=False
+        )
+        metadata = {
+            'name': filename,
+            'parents': [profile_photos_folder_id]
+        }
+
+        created = service.files().create(
+            body=metadata,
+            media_body=media,
+            fields='id,name,webViewLink,webContentLink'
+        ).execute()
+
+        return {
+            'success': True,
+            'file_id': created.get('id'),
+            'file': _serialize_drive_item(created)
+        }
+    except Exception as error:
+        print(f'Error uploading profile photo to Google Drive: {error}')
         return {
             'success': False,
             'message': str(error)

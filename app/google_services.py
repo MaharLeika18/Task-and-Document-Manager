@@ -10,6 +10,27 @@ from app.session_id_generation import generate_secure_string
 from .firebase_run import db, auth, verify_firebase_token
 dotenv.load_dotenv()
 
+# Status Constants
+PROJECT_STATUSES = ['planning', 'active', 'on-hold', 'completed', 'cancelled']
+TASK_STATUSES = ['todo', 'in-progress', 'in-review', 'done', 'blocked']
+
+# Valid status transitions
+VALID_PROJECT_TRANSITIONS = {
+    'planning': ['active', 'cancelled'],
+    'active': ['on-hold', 'completed', 'cancelled'],
+    'on-hold': ['active', 'cancelled'],
+    'completed': [],
+    'cancelled': ['active']  # Can reopen if needed
+}
+
+VALID_TASK_TRANSITIONS = {
+    'todo': ['in-progress', 'blocked'],
+    'in-progress': ['in-review', 'done', 'blocked'],
+    'in-review': ['done', 'in-progress', 'blocked'],
+    'done': [],
+    'blocked': ['todo', 'in-progress']
+}
+
 CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.events.owned"]
 
 def gcalendar_service():
@@ -196,19 +217,40 @@ def get_user_calendar_events(user_uid):
             if user_uid not in project_data.get('assigned_members', []):
                 continue
 
+            project_uid = project_data.get('project_uid')
+            project_name = project_data.get('project_name')
             project_start = project_data.get('start_date')
             project_end = project_data.get('end_date')
+            project_created = project_data.get('date_created') or project_start
+            
+            # Add project creation date event
+            if project_created:
+                created_date_str = project_created.split('T')[0] if 'T' in project_created else project_created
+                events.append({
+                    'id': f"{project_uid}_created",
+                    'type': 'project_created',
+                    'title': f"{project_name} (Created)",
+                    'description': project_data.get('project_description'),
+                    'created_date': created_date_str,
+                    'event_date': created_date_str,
+                    'link': project_data.get('calendar_link', ''),
+                })
+            
+            # Add project start/end event
             if project_start and project_end:
                 events.append({
-                    'id': project_data.get('project_uid'),
+                    'id': project_uid,
                     'type': 'project',
-                    'title': project_data.get('project_name'),
+                    'title': project_name,
                     'description': project_data.get('project_description'),
                     'start_date': project_start.split('T')[0] if 'T' in project_start else project_start,
                     'end_date': project_end.split('T')[0] if 'T' in project_end else project_end,
+                    'status': project_data.get('status', ''),
+                    'priority': project_data.get('priority', ''),
                     'link': project_data.get('calendar_link', ''),
                 })
 
+            # Add task deadlines
             for task in project_data.get('tasks', []):
                 if user_uid not in task.get('members', []):
                     continue
@@ -216,19 +258,117 @@ def get_user_calendar_events(user_uid):
                 if not due_date:
                     continue
                 events.append({
-                    'id': f"{project_data.get('project_uid')}_{task.get('name')}",
+                    'id': f"{project_uid}_{task.get('name')}",
                     'type': 'task',
                     'title': task.get('name'),
-                    'project': project_data.get('project_name'),
+                    'project': project_name,
                     'due_date': due_date.split('T')[0] if 'T' in due_date else due_date,
+                    'event_date': due_date.split('T')[0] if 'T' in due_date else due_date,
                     'status': task.get('status', ''),
                     'priority': task.get('priority', ''),
+                    'members': task.get('members', []),
                     'link': task.get('event_link', ''),
                 })
 
     except Exception as e:
         print(f'Error getting calendar events: {e}')
     return events
+
+
+def get_google_calendar_events(user_uid):
+    """Fetch events from Google Calendar for the user's calendar"""
+    try:
+        service = gcalendar_service()
+        calendar_id = os.getenv('COUNCILOG_CALENDAR_ID')
+        
+        if not calendar_id:
+            return []
+        
+        # Fetch events from Google Calendar for the next 6 months
+        now = datetime.utcnow().isoformat() + 'Z'
+        six_months_later = (datetime.utcnow() + timedelta(days=180)).isoformat() + 'Z'
+        
+        events_result = service.events().list(
+            calendarId=calendar_id,
+            timeMin=now,
+            timeMax=six_months_later,
+            singleEvents=True,
+            orderBy='startTime',
+            fields='items(id,summary,description,start,end,htmlLink,status)'
+        ).execute()
+        
+        events = []
+        for event in events_result.get('items', []):
+            start = event.get('start', {})
+            end = event.get('end', {})
+            
+            # Extract date from either dateTime or date field
+            start_date = start.get('dateTime', start.get('date', '')).split('T')[0]
+            end_date = end.get('dateTime', end.get('date', '')).split('T')[0]
+            
+            if start_date:
+                events.append({
+                    'id': event.get('id'),
+                    'type': 'google_calendar',
+                    'title': event.get('summary', 'Untitled'),
+                    'description': event.get('description', ''),
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'link': event.get('htmlLink', ''),
+                    'status': event.get('status', 'confirmed'),
+                    'source': 'google_calendar'
+                })
+        
+        return events
+    except Exception as e:
+        print(f'Error fetching Google Calendar events: {e}')
+        return []
+
+
+def merge_calendar_events(user_uid):
+    """Merge database events with Google Calendar events"""
+    database_events = get_user_calendar_events(user_uid)
+    google_events = get_google_calendar_events(user_uid)
+    
+    # Merge events, preferring database events for duplicates
+    merged = {event['id']: event for event in google_events}
+    for event in database_events:
+        merged[event['id']] = event
+    
+    return list(merged.values())
+
+
+def sync_task_to_google_calendar(task_event_id, task_name, project_name, status, due_date):
+    """Sync task status changes to Google Calendar event description"""
+    try:
+        service = gcalendar_service()
+        calendar_id = os.getenv('COUNCILOG_CALENDAR_ID')
+        
+        if not task_event_id or not calendar_id:
+            return False
+        
+        # Get the current event
+        event = service.events().get(
+            calendarId=calendar_id,
+            eventId=task_event_id
+        ).execute()
+        
+        # Update description with status
+        description = f"Task: {task_name}\nProject: {project_name}\nStatus: {status.replace('-', ' ').title()}\nUpdated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        event['description'] = description
+        
+        # Update the event
+        service.events().update(
+            calendarId=calendar_id,
+            eventId=task_event_id,
+            body=event
+        ).execute()
+        
+        return True
+    except Exception as e:
+        print(f'Error syncing task to Google Calendar: {e}')
+        return False
 
 
 def get_users():
@@ -240,15 +380,127 @@ def get_users():
             user_data = doc.to_dict()
             users.append({
                 'uid': user_data.get('uid', ''),
-                'name': user_data.get('username', '') or user_data.get('name', ''),
+                'name': user_data.get('display_name', '') or user_data.get('username', '') or user_data.get('name', '') or user_data.get('email', '').split('@')[0],
+                'username': user_data.get('username', ''),
+                'display_name': user_data.get('display_name', ''),
                 'email': user_data.get('email', ''),
                 'picture': user_data.get('picture', ''),
+                'photo_source': user_data.get('photo_source', 'custom'),
                 'role': user_data.get('role', 'Member')
             })
     except Exception as e:
         print(f"An error occurred while fetching users: {e}")
     
     return users
+
+
+def get_user_profile(uid):
+    try:
+        user_doc = db.collection('users').document(uid).get()
+        if not user_doc.exists:
+            return {'success': False, 'message': 'User not found'}
+
+        user_data = user_doc.to_dict()
+        return {
+            'success': True,
+            'user': {
+                'uid': user_data.get('uid', uid),
+                'name': user_data.get('display_name', '') or user_data.get('username', '') or user_data.get('name', '') or user_data.get('email', '').split('@')[0],
+                'username': user_data.get('username', ''),
+                'display_name': user_data.get('display_name', ''),
+                'email': user_data.get('email', ''),
+                'picture': user_data.get('picture', ''),
+                'photo_source': user_data.get('photo_source', 'custom'),
+                'date_created': user_data.get('date_created', ''),
+                'role': user_data.get('role', 'Member'),
+            }
+        }
+    except Exception as e:
+        print(f"An error occurred while fetching the user profile: {e}")
+        return {'success': False, 'message': str(e)}
+
+
+def update_user_profile(uid, display_name=None, picture=None, photo_source=None):
+    try:
+        user_ref = db.collection('users').document(uid)
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return {'success': False, 'message': 'User not found'}
+
+        updates = {}
+        if display_name is not None:
+            updates['display_name'] = display_name.strip()
+            updates['username'] = display_name.strip()
+        if picture is not None:
+            updates['picture'] = picture.strip()
+        if photo_source is not None:
+            updates['photo_source'] = photo_source
+
+        if not updates:
+            return {'success': False, 'message': 'No profile changes provided'}
+
+        user_ref.update(updates)
+
+        auth_updates = {}
+        if display_name is not None:
+            auth_updates['display_name'] = display_name.strip() or None
+        if picture is not None and picture.strip():
+            auth_updates['photo_url'] = picture.strip()
+
+        if auth_updates:
+            auth.update_user(uid, **auth_updates)
+
+        profile_result = get_user_profile(uid)
+        if profile_result.get('success'):
+            return {
+                'success': True,
+                'user': profile_result.get('user')
+            }
+
+        return {'success': True, 'message': 'Profile updated successfully'}
+    except Exception as e:
+        print(f"An error occurred while updating the user profile: {e}")
+        return {'success': False, 'message': str(e)}
+
+
+def delete_user_account(uid):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            changed = False
+
+            assigned_members = project_data.get('assigned_members', [])
+            if uid in assigned_members:
+                assigned_members = [member_uid for member_uid in assigned_members if member_uid != uid]
+                changed = True
+
+            tasks = project_data.get('tasks', [])
+            for task in tasks:
+                task_members = task.get('members', [])
+                if uid in task_members:
+                    task['members'] = [member_uid for member_uid in task_members if member_uid != uid]
+                    changed = True
+
+            if changed:
+                projects_ref.document(doc.id).update({
+                    'assigned_members': assigned_members,
+                    'tasks': tasks
+                })
+
+        db.collection('users').document(uid).delete()
+
+        try:
+            auth.delete_user(uid)
+        except Exception as auth_error:
+            print(f"Warning: Firebase Auth delete failed for {uid}: {auth_error}")
+
+        return {'success': True, 'message': 'Account deleted successfully'}
+    except Exception as e:
+        print(f"An error occurred while deleting the user account: {e}")
+        return {'success': False, 'message': str(e)}
 
 def get_member_summaries():
     summaries = {}
@@ -321,8 +573,16 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
     """
     Update the status of a specific task in a project.
     Only allows updates if the user is assigned to the task.
+    Validates status transitions and logs audit trail.
     """
     try:
+        # Validate new status
+        if new_status not in TASK_STATUSES:
+            return {
+                'success': False,
+                'message': f'Invalid status. Valid statuses are: {" | ".join(TASK_STATUSES)}'
+            }
+
         projects_ref = db.collection('projects')
         docs = projects_ref.stream()
 
@@ -333,15 +593,39 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
                 event_id = None
                 old_status = None
                 task_found = False
+                task_index = -1
 
-                # Find and update the task
-                for task in tasks:
+                # Find and validate task and user authorization
+                for idx, task in enumerate(tasks):
                     if task.get('name') == task_name and user_uid in task.get('members', []):
-                        old_status = task.get('status')
+                        old_status = task.get('status', 'todo')
+                        
+                        # Validate status transition
+                        valid_transitions = VALID_TASK_TRANSITIONS.get(old_status, [])
+                        if new_status not in valid_transitions:
+                            return {
+                                'success': False,
+                                'message': f'Cannot transition from "{old_status}" to "{new_status}". Valid transitions: {" | ".join(valid_transitions) if valid_transitions else "No transitions available (terminal state)"}'  
+                            }
+                        
                         task['status'] = new_status
+                        task['last_updated'] = datetime.now().isoformat()
+                        task['last_updated_by'] = user_uid
+                        
+                        # Add to audit trail
+                        if 'status_history' not in task:
+                            task['status_history'] = []
+                        task['status_history'].append({
+                            'status': new_status,
+                            'changed_by': user_uid,
+                            'changed_at': datetime.now().isoformat(),
+                            'previous_status': old_status
+                        })
+                        
                         event_id = task.get('event_id')
                         project_name = project_data.get('project_name', '')
                         task_found = True
+                        task_index = idx
                         break
 
                 if not task_found:
@@ -354,9 +638,15 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
                 if event_id and old_status != new_status:
                     update_task_event_status(event_id, task_name, project_name, new_status)
 
-                return {'success': True, 'message': 'Task status updated successfully'}
+                return {
+                    'success': True,
+                    'message': f'Task status updated from "{old_status}" to "{new_status}"',
+                    'old_status': old_status,
+                    'new_status': new_status,
+                    'task': tasks[task_index] if task_index >= 0 else None
+                }
 
-        return {'success': False, 'message': 'Project or task not found, or user not authorized'}
+        return {'success': False, 'message': 'Project not found'}
 
     except Exception as e:
         print(f"Error updating task status: {e}")
@@ -420,23 +710,65 @@ def update_project_status(project_uid, new_status, user_uid):
     """
     Update the status of a project.
     Only project members can update status.
+    Validates status transitions and logs audit trail.
     """
     try:
+        # Validate new status
+        if new_status not in PROJECT_STATUSES:
+            return {
+                'success': False,
+                'message': f'Invalid status. Valid statuses are: {" | ".join(PROJECT_STATUSES)}'
+            }
+
         projects_ref = db.collection('projects')
         docs = projects_ref.stream()
 
         for doc in docs:
             project_data = doc.to_dict()
-            if (project_data.get('project_uid') == project_uid and
-                user_uid in project_data.get('assigned_members', [])):
+            if project_data.get('project_uid') == project_uid:
+                # Check authorization
+                if user_uid not in project_data.get('assigned_members', []):
+                    return {'success': False, 'message': 'Not authorized to update project status'}
+                
+                old_status = project_data.get('status', 'planning')
+                
+                # Validate status transition
+                valid_transitions = VALID_PROJECT_TRANSITIONS.get(old_status, [])
+                if new_status not in valid_transitions:
+                    return {
+                        'success': False,
+                        'message': f'Cannot transition from "{old_status}" to "{new_status}". Valid transitions: {" | ".join(valid_transitions) if valid_transitions else "No transitions available (terminal state)"}'
+                    }
+                
+                # Prepare update data
+                update_data = {
+                    'status': new_status,
+                    'last_updated': datetime.now().isoformat(),
+                    'last_updated_by': user_uid
+                }
+                
+                # Add to status history
+                status_history = project_data.get('status_history', [])
+                status_history.append({
+                    'status': new_status,
+                    'changed_by': user_uid,
+                    'changed_at': datetime.now().isoformat(),
+                    'previous_status': old_status
+                })
+                update_data['status_history'] = status_history
 
                 # Update the project document
                 doc_ref = projects_ref.document(doc.id)
-                doc_ref.update({'status': new_status})
+                doc_ref.update(update_data)
 
-                return {'success': True, 'message': 'Project status updated successfully'}
+                return {
+                    'success': True,
+                    'message': f'Project status updated from "{old_status}" to "{new_status}"',
+                    'old_status': old_status,
+                    'new_status': new_status
+                }
 
-        return {'success': False, 'message': 'Project not found or user not authorized'}
+        return {'success': False, 'message': 'Project not found'}
 
     except Exception as e:
         print(f"Error updating project status: {e}")
@@ -473,6 +805,8 @@ def link_drive_file_to_project_task(project_uid, file_data, user_uid, task_name=
                 'linked_at': datetime.utcnow().isoformat() + 'Z'
             }
 
+            upsert_drive_file_record(file_reference)
+
             doc_ref = projects_ref.document(doc.id)
             if task_name:
                 tasks = project_data.get('tasks', [])
@@ -502,6 +836,78 @@ def link_drive_file_to_project_task(project_uid, file_data, user_uid, task_name=
         return {'success': False, 'message': 'Project not found'}
     except Exception as error:
         print(f'Error linking file to project/task: {error}')
+        return {'success': False, 'message': str(error)}
+
+
+def upsert_drive_file_record(file_data, project_uid=None, task_name=None, linked_by=None):
+    try:
+        file_id = file_data.get('file_id')
+        if not file_id:
+            return {'success': False, 'message': 'Missing file id'}
+
+        record = {
+            'file_id': file_id,
+            'name': file_data.get('name', ''),
+            'mime_type': file_data.get('mime_type', ''),
+            'size': file_data.get('size', '0'),
+            'modified_time': file_data.get('modified_time', ''),
+            'web_view_link': file_data.get('web_view_link', ''),
+            'web_content_link': file_data.get('web_content_link', ''),
+            'icon_link': file_data.get('icon_link', ''),
+            'parent_id': file_data.get('parent_id', ''),
+            'project_uid': project_uid or file_data.get('project_uid', ''),
+            'task_name': task_name or file_data.get('task_name', ''),
+            'linked_by': linked_by or file_data.get('linked_by', ''),
+            'updated_at': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        db.collection('drive_files').document(file_id).set(record, merge=True)
+        return {'success': True, 'record': record}
+    except Exception as error:
+        print(f'Error upserting drive file record: {error}')
+        return {'success': False, 'message': str(error)}
+
+
+def delete_drive_file_record(file_id):
+    try:
+        db.collection('drive_files').document(file_id).delete()
+        return {'success': True}
+    except Exception as error:
+        print(f'Error deleting drive file record: {error}')
+        return {'success': False, 'message': str(error)}
+
+
+def remove_drive_file_references(file_id):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            changed = False
+
+            project_files = [file_ref for file_ref in project_data.get('project_files', []) if file_ref.get('file_id') != file_id]
+            if len(project_files) != len(project_data.get('project_files', [])):
+                changed = True
+
+            tasks = project_data.get('tasks', [])
+            for task in tasks:
+                task_files = task.get('files', [])
+                filtered_files = [file_ref for file_ref in task_files if file_ref.get('file_id') != file_id]
+                if len(filtered_files) != len(task_files):
+                    task['files'] = filtered_files
+                    changed = True
+
+            if changed:
+                projects_ref.document(doc.id).update({
+                    'project_files': project_files,
+                    'tasks': tasks,
+                })
+
+        delete_drive_file_record(file_id)
+        return {'success': True}
+    except Exception as error:
+        print(f'Error removing drive file references: {error}')
         return {'success': False, 'message': str(error)}
 
 

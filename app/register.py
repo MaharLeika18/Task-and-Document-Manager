@@ -36,7 +36,8 @@ def register():
                 'display_name': user_data.get('display_name', ''),
                 'email': decoded.get("email"),
                 'date_created': user_data.get('date_created', ''),
-                'picture': decoded.get("picture", '')
+                'picture': decoded.get("picture", ''),
+                'photo_source': 'google'
             })
         
         return jsonify(success=True)

@@ -17,9 +17,6 @@
 <body>
     {% set user = session_data() %}
     <nav class="navbar">
-        <div class="logos">
-            <h2>Task Manager</h2>
-        </div>
 
         <div class="search-bar">
             <form action="#" method="GET">
@@ -31,14 +28,17 @@
         </div>
 
         <div class="utilities">
-            <button class="notification-button" title="Notifications">
+            {# <button class="notification-button" title="Notifications">
                 <span class="material-symbols-outlined">notifications</span>
             </button>
             <button class="mail-button" title="Messages">
                 <span class="material-symbols-outlined">mail</span>
-            </button>
-            <a href="#" class="profile-button"><img src="{{ session_data().get('picture') }}" alt="Profile"></a>
+            </button> #}
+            <a href="{{ url_for('members.profile') }}" class="profile-button"><img src="{{ session_data().get('picture') }}" alt="Profile"></a>
         </div>
+        {# <div class="logos">
+            <h2>Task Manager</h2>
+        </div> #}
     </nav>
 
     <div class="side-bar">

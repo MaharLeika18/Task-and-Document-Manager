@@ -3,7 +3,10 @@
 {% block title %}Members{% endblock %}
 
 {% block content %}
-<h1>Team Members</h1>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+    <h1 style="margin:0;">Team Members</h1>
+    <a href="{{ url_for('members.profile') }}" style="padding:0.7rem 1rem; border-radius:999px; background:#667eea; color:#fff; text-decoration:none; font-weight:600;">My Profile</a>
+</div>
 
 <div class="members-grid">
     {% for member in members %}

@@ -1,21 +1,27 @@
-from flask import Blueprint, jsonify, redirect, render_template, request, send_file, session
+from flask import Blueprint, jsonify, redirect, render_template, request, send_file, session, url_for
 from datetime import datetime
 import io
 from googleapiclient.http import MediaIoBaseDownload
 from .decorators import auth_required
 from .google_drive_services import (
     create_drive_folder,
+    delete_drive_item,
     download_drive_file,
+    get_drive_folder_metadata,
     get_drive_file_metadata,
     list_drive_items,
+    stream_drive_file,
     upload_file_to_drive,
     gdrive_service,
 )
 from .google_services import (
+    get_project_by_uid,
     get_project_file_references,
     get_projects_for_user,
     get_tasks_for_project_user,
     link_drive_file_to_project_task,
+    remove_drive_file_references,
+    upsert_drive_file_record,
 )
 
 # Create a blueprint named 'files'
@@ -44,6 +50,7 @@ def list_files_route():
     folder_id = request.args.get('folder_id')
     project_uid = request.args.get('project_uid')
     user_uid = session['uid']
+    current_folder = None
 
     # If project_uid provided and no explicit folder_id, use project's dedicated folder
     if project_uid and not folder_id:
@@ -52,12 +59,17 @@ def list_files_route():
             folder_id = project_data.get('drive_folder_id')
 
     items = list_drive_items(folder_id)
+    if folder_id:
+        folder_result = get_drive_folder_metadata(folder_id)
+        if folder_result.get('success'):
+            current_folder = folder_result.get('folder')
+
     references = None
     if project_uid:
         references_result = get_project_file_references(project_uid, user_uid)
         references = references_result if references_result.get('success') else None
 
-    return jsonify({'success': True, 'items': items, 'references': references})
+    return jsonify({'success': True, 'items': items, 'references': references, 'current_folder': current_folder})
 
 
 @files_bp.route('/api/create_folder', methods=['POST'])
@@ -105,6 +117,13 @@ def upload_file_route():
     if not upload_result.get('success'):
         return jsonify(upload_result), 500
 
+    upsert_drive_file_record(
+        upload_result['file'],
+        project_uid=project_uid,
+        task_name=task_name,
+        linked_by=user_uid,
+    )
+
     link_result = None
     if project_uid:
         link_result = link_drive_file_to_project_task(
@@ -119,6 +138,14 @@ def upload_file_route():
         'file': upload_result['file'],
         'link_result': link_result
     })
+
+
+@files_bp.route('/api/delete/<file_id>', methods=['POST'])
+@auth_required
+def delete_file_route(file_id):
+    remove_drive_file_references(file_id)
+    result = delete_drive_item(file_id)
+    return jsonify(result), 200 if result.get('success') else 500
 
 
 @files_bp.route('/api/link', methods=['POST'])
@@ -164,43 +191,73 @@ def view_file_route(file_id):
     file_data = result['file']
     mime_type = file_data.get('mime_type', '')
     
-    # Try to use Google's preview capability for files that support it
-    # Google Drive can preview most file types via webViewLink or preview URL
-    web_view_link = file_data.get('web_view_link')
-    web_content_link = file_data.get('web_content_link')
-    
     # For images, show in lightbox viewer
     if mime_type.startswith('image/'):
         return render_template('image_viewer.html', 
                              file_id=file_id, 
                              file_name=file_data.get('name', 'Image'),
-                             web_content_link=web_content_link,
+                             image_src=url_for('files.inline_file_route', file_id=file_id),
                              file_data=file_data)
     # For Google Docs/Sheets/Slides, use webViewLink
     elif 'google-apps' in mime_type:
-        target = web_view_link
+        return render_template(
+            'preview.html',
+            preview_url=url_for('files.inline_file_route', file_id=file_id, export='pdf'),
+            file_name=file_data.get('name', 'Document'),
+            file_id=file_id,
+        )
     # For PDF, try webContentLink first, then webViewLink
     elif mime_type in ['application/pdf']:
-        target = web_content_link or web_view_link
+        return render_template(
+            'preview.html',
+            preview_url=url_for('files.inline_file_route', file_id=file_id),
+            file_name=file_data.get('name', 'Document'),
+            file_id=file_id,
+        )
     # For Office documents, embed them in an iframe via Google Viewer
     elif any(fmt in mime_type for fmt in ['word', 'spreadsheet', 'presentation']) or \
          any(ext in mime_type for ext in ['.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt']):
-        # Use Google Docs viewer for Office documents
-        if web_content_link:
-            preview_url = f"https://docs.google.com/viewer?url={web_content_link}&embedded=true"
-            return render_template('preview.html', preview_url=preview_url, file_name=file_data.get('name', 'Document'))
-        target = web_view_link
+        return render_template(
+            'preview.html',
+            preview_url=url_for('files.inline_file_route', file_id=file_id),
+            file_name=file_data.get('name', 'Document'),
+            file_id=file_id,
+        )
     # For other file types, try webViewLink (Google Drive preview)
     else:
-        target = web_view_link or web_content_link
-    
-    if not target:
-        # If no preview link, try to create a preview URL with Google Docs Viewer
-        download_link = f"/files/download/{file_id}"
-        preview_url = f"https://docs.google.com/viewer?url={request.host_url.rstrip('/')}{download_link}&embedded=true"
-        return render_template('preview.html', preview_url=preview_url, file_name=file_data.get('name', 'Document'))
-    
-    return redirect(target)
+        return render_template(
+            'preview.html',
+            preview_url=url_for('files.inline_file_route', file_id=file_id),
+            file_name=file_data.get('name', 'Document'),
+            file_id=file_id,
+        )
+
+
+@files_bp.route('/inline/<file_id>', methods=['GET'])
+@auth_required
+def inline_file_route(file_id):
+    export = (request.args.get('export') or '').lower()
+    result = get_drive_file_metadata(file_id)
+    if not result.get('success'):
+        return jsonify(result), 404
+
+    file_data = result['file']
+    mime_type = file_data.get('mime_type', 'application/octet-stream')
+
+    if export == 'pdf' and mime_type.startswith('application/vnd.google-apps'):
+        stream_result = stream_drive_file(file_id, export_mime='application/pdf')
+    else:
+        stream_result = stream_drive_file(file_id)
+
+    if not stream_result.get('success'):
+        return jsonify(stream_result), 404
+
+    return send_file(
+        stream_result['file_obj'],
+        as_attachment=False,
+        download_name=stream_result.get('filename', file_data.get('name', 'file')),
+        mimetype=stream_result.get('mime_type', mime_type)
+    )
 
 
 @files_bp.route('/api/export/<file_id>', methods=['GET'])

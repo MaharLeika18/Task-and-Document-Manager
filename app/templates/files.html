@@ -32,6 +32,7 @@
         <div class="files-content-area">
             <div class="files-main">
                 <p id="files-status" class="files-status">Loading files...</p>
+                <div id="folder-breadcrumb" class="folder-breadcrumb"></div>
                 <div id="files-grid" class="files-grid"></div>
             </div>
 
@@ -151,6 +152,36 @@
         padding: 1rem;
         font-size: 0.95rem;
     }
+
+    .folder-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+        min-height: 2rem;
+    }
+
+    .breadcrumb-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid #d9def7;
+        background: #f7f8ff;
+        color: #4351a3;
+        font-size: 0.85rem;
+    }
+
+    .breadcrumb-chip button {
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        padding: 0;
+        font: inherit;
+    }
     
     .files-grid {
         display: grid;
@@ -172,12 +203,20 @@
         align-items: center;
         gap: 0.5rem;
     }
+
+    .file-item.folder {
+        background: linear-gradient(180deg, #fffdf5 0%, #fff7de 100%);
+    }
     
     .file-item:hover {
         background: white;
         border-color: #667eea;
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
         transform: translateY(-2px);
+    }
+
+    .file-item.folder {
+        cursor: pointer;
     }
     
     .file-icon {
@@ -220,6 +259,14 @@
     
     .action-link:hover {
         background: #5a67d8;
+    }
+
+    .action-danger {
+        background: #dc3545;
+    }
+
+    .action-danger:hover {
+        background: #b52a37;
     }
     
     .file-reference-panel {
@@ -353,6 +400,7 @@
     const projectFilter = document.getElementById('project-filter');
     const taskFilter = document.getElementById('task-filter');
     const referencesList = document.getElementById('references-list');
+    const folderBreadcrumb = document.getElementById('folder-breadcrumb');
 
     const uploadModal = document.getElementById('upload-modal');
     const uploadBtn = document.getElementById('upload-file');
@@ -361,6 +409,9 @@
     const fileInput = document.getElementById('file-input');
 
     let allFiles = [];
+    let currentFolderId = '';
+    let folderStack = [];
+    let currentFolder = null;
 
     function formatBytes(bytes) {
         const num = Number(bytes || 0);
@@ -414,6 +465,58 @@
         return 'FILE';
     }
 
+    function getActiveFolderLabel() {
+        if (currentFolder && currentFolder.name) {
+            return currentFolder.name;
+        }
+
+        const projectUid = getSelectedProjectUid();
+        if (projectUid) {
+            const selectedProject = PROJECTS.find(project => project.project_uid === projectUid);
+            return selectedProject ? `${selectedProject.project_name} / root` : 'Project root';
+        }
+
+        return 'Drive root';
+    }
+
+    function renderBreadcrumb() {
+        const label = getActiveFolderLabel();
+        const parentStack = folderStack.slice(0, -1);
+
+        const parts = [
+            `<span class="breadcrumb-chip"><button type="button" data-folder-home>Drive root</button></span>`
+        ];
+
+        parentStack.forEach((folder, index) => {
+            parts.push(`<span class="breadcrumb-chip"><button type="button" data-folder-index="${index}">${folder.name}</button></span>`);
+        });
+
+        parts.push(`<span class="breadcrumb-chip">${label}</span>`);
+
+        if (currentFolderId) {
+            parts.push('<span class="breadcrumb-chip"><button type="button" data-folder-up>Up one level</button></span>');
+        }
+
+        folderBreadcrumb.innerHTML = parts.join('');
+        folderBreadcrumb.querySelector('[data-folder-home]')?.addEventListener('click', () => {
+            if (currentFolderId || folderStack.length) {
+                currentFolderId = '';
+                folderStack = [];
+                currentFolder = null;
+                loadFiles();
+            }
+        });
+
+        folderBreadcrumb.querySelectorAll('[data-folder-index]').forEach(button => {
+            button.addEventListener('click', () => {
+                const folderIndex = Number(button.getAttribute('data-folder-index'));
+                navigateToFolderIndex(folderIndex);
+            });
+        });
+
+        folderBreadcrumb.querySelector('[data-folder-up]')?.addEventListener('click', goUpOneLevel);
+    }
+
     function getSelectedProjectUid() {
         return projectFilter.value || '';
     }
@@ -445,6 +548,11 @@
     function fileCard(file) {
         const card = document.createElement('div');
         card.className = `file-item ${file.is_folder ? 'folder' : 'file'}`;
+        card.tabIndex = file.is_folder ? 0 : -1;
+        if (file.is_folder) {
+            card.setAttribute('role', 'button');
+            card.setAttribute('aria-label', `Open folder ${file.name}`);
+        }
 
         const modifiedText = file.modified_time ? new Date(file.modified_time).toLocaleString() : 'Unknown date';
         const sizeText = file.is_folder ? 'Folder' : formatBytes(file.size);
@@ -456,15 +564,39 @@
                 <p>${sizeText} • ${modifiedText}</p>
             </div>
             <div class="file-actions-inline">
-                ${!file.is_folder ? `<a href="/files/view/${file.file_id}" target="_blank" class="action-link">View</a>` : ''}
+                ${file.is_folder ? `<button type="button" class="action-link" data-open-folder="${file.file_id}">Open</button>` : `<a href="/files/view/${file.file_id}" target="_blank" class="action-link">View</a>`}
                 ${!file.is_folder ? `<a href="/files/download/${file.file_id}" class="action-link">Download</a>` : ''}
                 ${!file.is_folder ? `<button type="button" class="action-link" data-link-file-id="${file.file_id}">Link</button>` : ''}
+                <button type="button" class="action-link action-danger" data-delete-file-id="${file.file_id}">Delete</button>
             </div>
         `;
+
+        if (file.is_folder) {
+            card.addEventListener('click', () => openFolder(file.file_id));
+            card.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openFolder(file.file_id);
+                }
+            });
+        }
 
         const linkButton = card.querySelector('button[data-link-file-id]');
         if (linkButton) {
             linkButton.addEventListener('click', () => linkExistingFile(file.file_id));
+        }
+
+        const openButton = card.querySelector('button[data-open-folder]');
+        if (openButton) {
+            openButton.addEventListener('click', () => openFolder(file.file_id));
+        }
+
+        const deleteButton = card.querySelector('button[data-delete-file-id]');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', event => {
+                event.stopPropagation();
+                deleteDriveItem(file);
+            });
         }
 
         return card;
@@ -551,6 +683,9 @@
             if (projectUid) {
                 url.searchParams.append('project_uid', projectUid);
             }
+            if (currentFolderId) {
+                url.searchParams.append('folder_id', currentFolderId);
+            }
             
             const response = await fetch(url);
             const data = await response.json();
@@ -560,7 +695,13 @@
             }
 
             allFiles = data.items || [];
+            currentFolder = data.current_folder || null;
+            if (!folderStack.length && currentFolder) {
+                folderStack = [currentFolder];
+                currentFolderId = currentFolder.file_id || currentFolderId;
+            }
             statusEl.textContent = `${allFiles.length} item(s) loaded from Google Drive.`;
+            renderBreadcrumb();
             applySearch();
             
             // Render references - pass the data directly from the response
@@ -643,6 +784,9 @@
         for (const file of files) {
             const formData = new FormData();
             formData.append('file', file);
+            if (currentFolderId) {
+                formData.append('folder_id', currentFolderId);
+            }
             if (projectUid) {
                 formData.append('project_uid', projectUid);
             }
@@ -672,15 +816,76 @@
             return;
         }
 
+        const projectUid = getSelectedProjectUid();
+
         const response = await fetch('/files/api/create_folder', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name.trim() })
+            body: JSON.stringify({
+                name: name.trim(),
+                project_uid: projectUid || null,
+                parent_folder_id: currentFolderId || null,
+            })
         });
         const data = await response.json();
 
         if (!data.success) {
             alert(data.message || 'Could not create folder.');
+            return;
+        }
+
+        await loadFiles();
+    }
+
+    function openFolder(folderId) {
+        if (!folderId) {
+            return;
+        }
+
+        const folderItem = allFiles.find(item => item.file_id === folderId && item.is_folder);
+        if (folderItem && folderStack[folderStack.length - 1]?.file_id !== folderId) {
+            folderStack = [...folderStack, folderItem];
+        }
+
+        currentFolderId = folderId;
+        loadFiles();
+    }
+
+    function navigateToFolderIndex(folderIndex) {
+        if (folderIndex < 0 || folderIndex >= folderStack.length) {
+            return;
+        }
+
+        const nextStack = folderStack.slice(0, folderIndex + 1);
+        folderStack = nextStack;
+        currentFolderId = nextStack[nextStack.length - 1]?.file_id || '';
+        loadFiles();
+    }
+
+    function goUpOneLevel() {
+        if (!currentFolderId) {
+            return;
+        }
+
+        const parentId = currentFolder?.parent_id || '';
+        folderStack = folderStack.slice(0, -1);
+        currentFolderId = parentId;
+        loadFiles();
+    }
+
+    async function deleteDriveItem(file) {
+        const confirmed = confirm(`Delete ${file.name}? This will move it to the trash.`);
+        if (!confirmed) {
+            return;
+        }
+
+        const response = await fetch(`/files/api/delete/${encodeURIComponent(file.file_id)}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (!data.success) {
+            alert(data.message || 'Could not delete the item.');
             return;
         }
 
@@ -708,6 +913,9 @@
 
     projectFilter.addEventListener('change', async () => {
         buildTaskOptions(projectFilter.value);
+        currentFolderId = '';
+        folderStack = [];
+        currentFolder = null;
         await loadFiles();
     });
 

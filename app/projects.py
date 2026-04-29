@@ -1,4 +1,7 @@
-from .google_services import create_project_firestore, create_project_gcalendar, create_task_gcalendar, get_project_by_uid, get_tasks_for_project_user, get_users, get_projects_for_user, update_task_status, add_task_to_project, update_project_status
+from .google_services import (create_project_firestore, create_project_gcalendar, create_task_gcalendar, 
+    get_project_by_uid, get_tasks_for_project_user, get_users, get_projects_for_user, update_task_status, 
+    add_task_to_project, update_project_status, TASK_STATUSES, PROJECT_STATUSES, 
+    VALID_TASK_TRANSITIONS, VALID_PROJECT_TRANSITIONS, sync_task_to_google_calendar)
 from flask import Blueprint, render_template, redirect, session, url_for, request, jsonify
 from datetime import datetime
 
@@ -100,6 +103,16 @@ def update_task_status_route():
         return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
     result = update_task_status(project_uid, task_name, new_status, user_uid)
+    
+    # Sync task status change to Google Calendar
+    if result.get('success'):
+        _, project_data = get_project_by_uid(project_uid)
+        if project_data:
+            project_name = project_data.get('project_name', 'Project')
+            # Construct task event ID (typically project_uid_taskname)
+            task_event_id = f"{project_uid}_{task_name}".replace(' ', '_')
+            sync_task_to_google_calendar(task_event_id, task_name, project_name, new_status)
+    
     return jsonify(result)
 
 @projects_bp.route('/add_task', methods=['POST'])
@@ -170,3 +183,69 @@ def get_project_tasks(project_uid):
     user_uid = session['uid']
     tasks = get_tasks_for_project_user(project_uid, user_uid)
     return jsonify({'success': True, 'tasks': tasks})
+
+@projects_bp.route('/api/status_info', methods=['GET'])
+@auth_required
+def get_status_info():
+    """Get available statuses and valid transitions"""
+    return jsonify({
+        'success': True,
+        'project_statuses': PROJECT_STATUSES,
+        'task_statuses': TASK_STATUSES,
+        'valid_project_transitions': VALID_PROJECT_TRANSITIONS,
+        'valid_task_transitions': VALID_TASK_TRANSITIONS
+    })
+
+@projects_bp.route('/api/project_status_transitions/<project_uid>', methods=['GET'])
+@auth_required
+def get_project_status_transitions(project_uid):
+    """Get valid status transitions for a specific project"""
+    user_uid = session['uid']
+    doc_id, project_data = get_project_by_uid(project_uid)
+    
+    if not project_data:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    if user_uid not in project_data.get('assigned_members', []):
+        return jsonify({'success': False, 'message': 'Not authorized'}), 403
+    
+    current_status = project_data.get('status', 'planning')
+    valid_transitions = VALID_PROJECT_TRANSITIONS.get(current_status, [])
+    
+    return jsonify({
+        'success': True,
+        'current_status': current_status,
+        'valid_transitions': valid_transitions
+    })
+
+@projects_bp.route('/api/task_status_transitions/<project_uid>/<task_name>', methods=['GET'])
+@auth_required
+def get_task_status_transitions(project_uid, task_name):
+    """Get valid status transitions for a specific task"""
+    user_uid = session['uid']
+    doc_id, project_data = get_project_by_uid(project_uid)
+    
+    if not project_data:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    if user_uid not in project_data.get('assigned_members', []):
+        return jsonify({'success': False, 'message': 'Not authorized'}), 403
+    
+    # Find the task
+    task = None
+    for t in project_data.get('tasks', []):
+        if t.get('name') == task_name:
+            task = t
+            break
+    
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+    
+    current_status = task.get('status', 'todo')
+    valid_transitions = VALID_TASK_TRANSITIONS.get(current_status, [])
+    
+    return jsonify({
+        'success': True,
+        'current_status': current_status,
+        'valid_transitions': valid_transitions
+    })

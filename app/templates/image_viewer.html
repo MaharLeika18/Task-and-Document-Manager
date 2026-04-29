@@ -18,8 +18,8 @@
     </div>
     
     <div class="document-content image-content">
-        {% if web_content_link %}
-            <img id="image-display" src="{{ web_content_link }}" alt="{{ file_name }}" class="image-display">
+        {% if image_src %}
+            <img id="image-display" src="{{ image_src }}" alt="{{ file_name }}" class="image-display">
         {% else %}
             <div class="document-placeholder">
                 <p>Unable to load image preview</p>

@@ -3,49 +3,732 @@
 {% block title %}Calendar{% endblock %}
 
 {% block content %}
-<h1>Project Calendar</h1>
+<style>
+    .calendar-page {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 1.5rem;
+        padding: 1.5rem;
+    }
 
-<div class="calendar-container">
-    <div class="calendar-header">
-        <button id="prev-month">&lt;</button>
-        <h2 id="calendar-title" class="calendar-title"></h2>
-        <button id="next-month">&gt;</button>
+    .calendar-section h1 {
+        margin: 0 0 1.5rem 0;
+        font-size: 2rem;
+        color: #1f2937;
+    }
+
+    .calendar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .calendar-header button {
+        background: linear-gradient(135deg, #667eea, #4f46e5);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: transform 0.18s ease;
+    }
+
+    .calendar-header button:hover {
+        transform: scale(1.05);
+    }
+
+    .calendar-title {
+        font-size: 1.5rem;
+        color: #111827;
+        min-width: 200px;
+        text-align: center;
+    }
+
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+        background: white;
+        padding: 1rem;
+        border-radius: 16px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .day-header {
+        font-weight: 700;
+        color: #4f46e5;
+        text-align: center;
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .calendar-day {
+        aspect-ratio: 1;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 0.5rem;
+        min-height: 100px;
+        cursor: pointer;
+        background: white;
+        transition: all 0.18s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .calendar-day:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .calendar-day.other-month {
+        background: #f9fafb;
+        color: #d1d5db;
+    }
+
+    .calendar-day.today {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border-color: #fbbf24;
+        font-weight: 700;
+    }
+
+    .calendar-day.has-deadline {
+        border-color: #ef4444;
+    }
+
+    .day-number {
+        font-weight: 600;
+        color: #111827;
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .calendar-day-events {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.7rem;
+        overflow: hidden;
+    }
+
+    .event-pill {
+        background: #eef2ff;
+        color: #4f46e5;
+        padding: 0.2rem 0.4rem;
+        border-radius: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.18s ease;
+    }
+
+    .event-pill:hover {
+        background: #667eea;
+        color: white;
+        transform: scale(1.02);
+    }
+
+    .event-pill.project {
+        background: #dbeafe;
+        color: #0284c7;
+    }
+
+    .event-pill.project:hover {
+        background: #0284c7;
+        color: white;
+    }
+
+    .event-pill.created {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .event-pill.created:hover {
+        background: #166534;
+        color: white;
+    }
+
+    .event-pill.task {
+        background: #fce7f3;
+        color: #be185d;
+    }
+
+    .event-pill.task:hover {
+        background: #be185d;
+        color: white;
+    }
+
+    .event-pill.completed {
+        background: #d1d5db;
+        color: #6b7280;
+        text-decoration: line-through;
+    }
+
+    .event-pill.more {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .sidebar {
+        background: white;
+        border-radius: 16px;
+        border: 1px solid #e5e7eb;
+        padding: 1.5rem;
+        height: fit-content;
+        position: sticky;
+        top: 1rem;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+    }
+
+    .sidebar h2 {
+        margin: 0 0 1rem 0;
+        font-size: 1.2rem;
+        color: #111827;
+    }
+
+    .event-card {
+        padding: 1rem;
+        border-radius: 12px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 0.75rem;
+        transition: all 0.18s ease;
+    }
+
+    .event-card:hover {
+        border-color: #667eea;
+        background: #f3f4f6;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+    }
+
+    .event-card.project-created {
+        border-left: 4px solid #16a34a;
+    }
+
+    .event-card.project {
+        border-left: 4px solid #0284c7;
+    }
+
+    .event-card.task {
+        border-left: 4px solid #be185d;
+    }
+
+    .event-name {
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.25rem;
+        word-break: break-word;
+    }
+
+    .event-date {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-bottom: 0.25rem;
+    }
+
+    .event-meta {
+        font-size: 0.8rem;
+        color: #9ca3af;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .event-badge {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        background: #e5e7eb;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+
+    .event-badge.urgent {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .event-badge.completed {
+        background: #d1d5db;
+        color: #6b7280;
+    }
+
+    @media (max-width: 1200px) {
+        .calendar-page {
+            grid-template-columns: 1fr;
+        }
+        
+        .sidebar {
+            position: static;
+        }
+    }
+
+    /* Event Detail Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s ease;
+    }
+
+    .modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .modal-content {
+        background-color: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideIn 0.3s ease;
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #1f2937;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6b7280;
+        transition: color 0.2s ease;
+    }
+
+    .modal-close:hover {
+        color: #1f2937;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .event-detail-row {
+        margin-bottom: 1.25rem;
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 1rem;
+    }
+
+    .event-detail-label {
+        font-weight: 600;
+        color: #4f46e5;
+        font-size: 0.9rem;
+    }
+
+    .event-detail-value {
+        color: #1f2937;
+        word-break: break-word;
+    }
+
+    .event-detail-badge {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .event-detail-badge.created {
+        background: #dbeafe;
+        color: #0c4a6e;
+    }
+
+    .event-detail-badge.project {
+        background: #dbeafe;
+        color: #0c4a6e;
+    }
+
+    .event-detail-badge.task {
+        background: #fce7f3;
+        color: #831843;
+    }
+
+    .event-detail-badge.google_calendar {
+        background: #f3e8ff;
+        color: #6b21a8;
+    }
+
+    .status-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .status-planning {
+        background: #f3e8ff;
+        color: #6b21a8;
+    }
+
+    .status-active {
+        background: #dbeafe;
+        color: #0c4a6e;
+    }
+
+    .status-on-hold {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-cancelled {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .status-todo {
+        background: #f3f4f6;
+        color: #374151;
+    }
+
+    .status-in-progress {
+        background: #dbeafe;
+        color: #0c4a6e;
+    }
+
+    .status-in-review {
+        background: #fce7f3;
+        color: #831843;
+    }
+
+    .status-done {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-blocked {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .modal-body-description {
+        background: #f9fafb;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #4f46e5;
+        color: #374151;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .event-members {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .member-badge {
+        background: #e0e7ff;
+        color: #4f46e5;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+    }
+
+    .modal-footer {
+        padding: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+    }
+
+    .modal-footer button {
+        padding: 0.5rem 1.5rem;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    .modal-footer .btn-secondary {
+        background: #e5e7eb;
+        color: #1f2937;
+    }
+
+    .modal-footer .btn-secondary:hover {
+        background: #d1d5db;
+    }
+
+    .modal-footer .btn-link {
+        background: #4f46e5;
+        color: white;
+    }
+
+    .modal-footer .btn-link:hover {
+        background: #4f46e5;
+        transform: translateY(-2px);
+    }
+
+</style>
+
+<div class="calendar-page">
+    <div class="calendar-section">
+        <h1>Project Calendar</h1>
+        <div class="calendar-header">
+            <button id="prev-month">&lt; Previous</button>
+            <h2 id="calendar-title" class="calendar-title"></h2>
+            <button id="next-month">Next &gt;</button>
+        </div>
+
+        <div class="calendar-grid">
+            <div class="day-header">Sun</div>
+            <div class="day-header">Mon</div>
+            <div class="day-header">Tue</div>
+            <div class="day-header">Wed</div>
+            <div class="day-header">Thu</div>
+            <div class="day-header">Fri</div>
+            <div class="day-header">Sat</div>
+        </div>
+
+        <div id="calendar-days" class="calendar-grid" style="grid-template-columns: repeat(7, 1fr); margin-top: 0;">
+            <!-- Calendar days will be populated by JavaScript -->
+        </div>
     </div>
 
-    <div class="calendar-grid">
-        <div class="day-header">Sun</div>
-        <div class="day-header">Mon</div>
-        <div class="day-header">Tue</div>
-        <div class="day-header">Wed</div>
-        <div class="day-header">Thu</div>
-        <div class="day-header">Fri</div>
-        <div class="day-header">Sat</div>
-    </div>
-
-    <div id="calendar-days" class="calendar-days">
-        <!-- Calendar days will be populated by JavaScript -->
+    <div class="sidebar">
+        <h2>📅 Upcoming</h2>
+        <div id="events-list">
+            <!-- Events will be populated here -->
+        </div>
     </div>
 </div>
 
-<div class="upcoming-events">
-    <h2>Upcoming Events</h2>
-    <div id="events-list">
-        <!-- Events will be populated here -->
+<!-- Event Detail Modal -->
+<div id="event-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">Event Details</h2>
+            <button class="modal-close" onclick="closeEventModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="modal-details">
+                <!-- Event details will be populated here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeEventModal()">Close</button>
+            <a id="modal-link" href="#" class="btn-link" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">View in Calendar →</a>
+        </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Simple calendar implementation
     const calendarDays = document.getElementById('calendar-days');
     const calendarTitle = document.getElementById('calendar-title');
     const prevButton = document.getElementById('prev-month');
     const nextButton = document.getElementById('next-month');
     const eventsList = document.getElementById('events-list');
+    const eventModal = document.getElementById('event-modal');
 
     let currentDate = new Date();
     let calendarEvents = [];
+
+    function getEventTypeClass(event) {
+        if (event.type === 'project_created') return 'created';
+        if (event.type === 'project') return 'project';
+        if (event.type === 'task') return 'task';
+        if (event.type === 'google_calendar') return 'google_calendar';
+        return '';
+    }
+
+    function formatDateRange(startDate, endDate) {
+        if (!startDate) return 'No date';
+        if (!endDate || startDate === endDate) {
+            return new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        const start = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const end = new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `${start} - ${end}`;
+    }
+
+    function showEventModal(event) {
+        const modal = document.getElementById('event-modal');
+        const title = document.getElementById('modal-title');
+        const details = document.getElementById('modal-details');
+        const linkBtn = document.getElementById('modal-link');
+
+        title.textContent = event.title;
+        let typeLabel = event.type === 'project_created' ? 'Created' : 
+                       event.type === 'project' ? 'Project' : 
+                       event.type === 'task' ? 'Task' : 'Calendar Event';
+
+        let detailsHTML = `
+            <div class="event-detail-row">
+                <div class="event-detail-label">Type</div>
+                <div class="event-detail-value">
+                    <span class="event-detail-badge ${getEventTypeClass(event)}">${typeLabel}</span>
+                </div>
+            </div>
+        `;
+
+        // Add status badge if available
+        if (event.status) {
+            const statusClass = `status-${event.status}`;
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Status</div>
+                    <div class="event-detail-value">
+                        <span class="status-badge ${statusClass}">${event.status.replace('-', ' ').toUpperCase()}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Add dates
+        if (event.type === 'project' && event.start_date && event.end_date) {
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Timeline</div>
+                    <div class="event-detail-value">${formatDateRange(event.start_date, event.end_date)}</div>
+                </div>
+            `;
+        } else if (event.due_date) {
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Due Date</div>
+                    <div class="event-detail-value">${new Date(event.due_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                </div>
+            `;
+        } else if (event.event_date || event.created_date) {
+            const dateStr = event.event_date || event.created_date;
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Date</div>
+                    <div class="event-detail-value">${new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                </div>
+            `;
+        }
+
+        // Add project name for tasks
+        if (event.project) {
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Project</div>
+                    <div class="event-detail-value">${event.project}</div>
+                </div>
+            `;
+        }
+
+        // Add priority if available
+        if (event.priority) {
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Priority</div>
+                    <div class="event-detail-value">${event.priority.charAt(0).toUpperCase() + event.priority.slice(1)}</div>
+                </div>
+            `;
+        }
+
+        // Add members if available
+        if (event.members && event.members.length > 0) {
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Assigned To</div>
+                    <div class="event-detail-value">
+                        <div class="event-members">
+                            ${event.members.map(member => `<span class="member-badge">${member}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Add description if available
+        if (event.description) {
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Description</div>
+                    <div class="event-detail-value">
+                        <div class="modal-body-description">${event.description}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Add source indicator
+        if (event.source === 'google_calendar') {
+            detailsHTML += `
+                <div class="event-detail-row">
+                    <div class="event-detail-label">Source</div>
+                    <div class="event-detail-value">
+                        <span style="color: #666; font-size: 0.85rem;">📅 Google Calendar</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        details.innerHTML = detailsHTML;
+
+        // Set link button
+        if (event.link) {
+            linkBtn.href = event.link;
+            linkBtn.style.display = 'inline-flex';
+        } else {
+            linkBtn.style.display = 'none';
+        }
+
+        modal.classList.add('show');
+    }
+
+    function closeEventModal() {
+        const modal = document.getElementById('event-modal');
+        modal.classList.remove('show');
+    }
 
     function renderCalendar() {
         const year = currentDate.getFullYear();
@@ -57,11 +740,14 @@
         });
 
         const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
         const startDate = new Date(firstDay);
         startDate.setDate(startDate.getDate() - firstDay.getDay());
 
-        calendarDays.innerHTML = '';
+        const calendarGrid = document.querySelector('#calendar-days');
+        if (!calendarGrid) return;
+        
+        calendarGrid.innerHTML = '';
+        calendarGrid.classList.add('calendar-grid');
 
         for (let i = 0; i < 42; i++) {
             const day = new Date(startDate);
@@ -84,56 +770,160 @@
             dayElement.appendChild(dayNumber);
 
             const dateKey = day.toISOString().split('T')[0];
-            const dayEvents = calendarEvents.filter(event => event.start_date === dateKey || event.due_date === dateKey);
-            if (dayEvents.length) {
-                if (dayEvents.some(event => event.type === 'task' && event.status === 'done')) {
+            const dayEvents = calendarEvents.filter(event => {
+                const eventDate = event.start_date || event.due_date || event.created_date || event.event_date;
+                return eventDate === dateKey;
+            });
+            
+            if (dayEvents.length > 0) {
+                if (dayEvents.some(e => e.type === 'task' && (e.status === 'done' || e.status === 'completed'))) {
                     dayElement.classList.add('completed');
+                }
+                if (dayEvents.some(e => e.type === 'task' && e.priority === 'high')) {
+                    dayElement.classList.add('has-deadline');
                 }
 
                 const eventContainer = document.createElement('div');
                 eventContainer.className = 'calendar-day-events';
-                dayEvents.slice(0, 2).forEach(event => {
+                
+                dayEvents.slice(0, 3).forEach(event => {
                     const pill = document.createElement('span');
-                    pill.className = `event-pill ${event.type === 'project' ? 'project' : event.status === 'done' ? 'completed' : ''}`;
-                    pill.textContent = event.title;
+                    const typeClass = getEventTypeClass(event);
+                    pill.className = `event-pill ${typeClass}`;
+                    pill.textContent = event.title.substring(0, 15);
+                    pill.title = event.title;
+                    pill.style.cursor = 'pointer';
+                    pill.onclick = (e) => {
+                        e.stopPropagation();
+                        showEventModal(event);
+                    };
                     eventContainer.appendChild(pill);
                 });
-                if (dayEvents.length > 2) {
+                
+                if (dayEvents.length > 3) {
                     const more = document.createElement('span');
                     more.className = 'event-pill more';
-                    more.textContent = `+${dayEvents.length - 2} more`;
+                    more.textContent = `+${dayEvents.length - 3}`;
+                    more.style.cursor = 'pointer';
+                    more.onclick = (e) => {
+                        e.stopPropagation();
+                        showDayEventsModal(dateKey, dayEvents);
+                    };
                     eventContainer.appendChild(more);
                 }
                 dayElement.appendChild(eventContainer);
             }
 
-            calendarDays.appendChild(dayElement);
+            // Make entire day clickable to show day events
+            dayElement.style.cursor = 'pointer';
+            dayElement.onclick = () => {
+                if (dayEvents.length > 0) {
+                    showDayEventsModal(dateKey, dayEvents);
+                }
+            };
+
+            calendarGrid.appendChild(dayElement);
+        }
+    }
+
+    function showDayEventsModal(dateKey, dayEvents) {
+        const modal = document.getElementById('event-modal');
+        const title = document.getElementById('modal-title');
+        const details = document.getElementById('modal-details');
+        const linkBtn = document.getElementById('modal-link');
+
+        const dateObj = new Date(dateKey);
+        title.textContent = `Events for ${dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
+        linkBtn.style.display = 'none';
+
+        let detailsHTML = '<div style="display: grid; gap: 1.5rem;">';
+        
+        dayEvents.forEach(event => {
+            const typeClass = getEventTypeClass(event);
+            let typeLabel = event.type === 'project_created' ? 'Created' : 
+                           event.type === 'project' ? 'Project' : 
+                           event.type === 'task' ? 'Task' : 'Calendar Event';
+
+            detailsHTML += `
+                <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.boxShadow='0 4px 12px rgba(79, 70, 229, 0.15)'" onmouseout="this.style.boxShadow='none'" onclick="showEventModal(calendarEvents.find(e => e.id === '${event.id}'))">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                        <div style="font-weight: 700; font-size: 1.1rem; color: #1f2937;">${event.title}</div>
+                        <span class="event-detail-badge ${typeClass}">${typeLabel}</span>
+                    </div>
+                    ${event.status ? `<div style="margin-bottom: 0.5rem;"><span class="status-badge status-${event.status}">${event.status.replace('-', ' ').toUpperCase()}</span></div>` : ''}
+                    ${event.project ? `<div style="color: #666; font-size: 0.9rem; margin-bottom: 0.5rem;">Project: ${event.project}</div>` : ''}
+                    ${event.description ? `<div style="color: #666; font-size: 0.9rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">${event.description.substring(0, 150)}${event.description.length > 150 ? '...' : ''}</div>` : ''}
+                </div>
+            `;
+        });
+
+        detailsHTML += '</div>';
+        details.innerHTML = detailsHTML;
+        modal.classList.add('show');
+    }
+
+    function scrollToEvent(event) {
+        const eventCards = document.querySelectorAll('.event-card');
+        for (let card of eventCards) {
+            if (card.dataset.eventId === event.id) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                card.style.animation = 'pulse 0.6s';
+                break;
+            }
         }
     }
 
     function renderUpcomingEvents() {
         eventsList.innerHTML = '';
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
         const upcoming = calendarEvents
             .filter(event => {
-                const dateString = event.start_date || event.due_date;
-                return new Date(dateString) >= new Date();
+                const eventDate = event.start_date || event.due_date || event.created_date || event.event_date;
+                return new Date(eventDate) >= today;
             })
-            .sort((a, b) => new Date((a.start_date || a.due_date)) - new Date((b.start_date || b.due_date)));
+            .sort((a, b) => {
+                const dateA = new Date(a.start_date || a.due_date || a.created_date || a.event_date);
+                const dateB = new Date(b.start_date || b.due_date || b.created_date || b.event_date);
+                return dateA - dateB;
+            });
 
         if (!upcoming.length) {
-            eventsList.innerHTML = '<p>No upcoming events at the moment.</p>';
+            eventsList.innerHTML = '<p style="color: #9ca3af; text-align: center; margin: 1rem 0;">No upcoming events.</p>';
             return;
         }
 
-        upcoming.slice(0, 10).forEach(event => {
+        upcoming.slice(0, 15).forEach(event => {
             const card = document.createElement('div');
-            card.className = 'event-card';
+            const typeClass = getEventTypeClass(event);
+            card.className = `event-card ${typeClass}`;
+            card.dataset.eventId = event.id;
+            card.style.cursor = 'pointer';
+            card.onclick = () => showEventModal(event);
+            
+            const eventDate = event.start_date || event.due_date || event.created_date || event.event_date;
+            let badges = '';
+            
+            if (event.type === 'task') {
+                if (event.status === 'done' || event.status === 'completed') {
+                    badges += '<span class="event-badge completed">✓ Done</span>';
+                }
+                if (event.priority === 'high') {
+                    badges += '<span class="event-badge urgent">⚠ Urgent</span>';
+                }
+            }
+            
+            let typeLabel = event.type === 'project_created' ? 'Created' : 
+                           event.type === 'project' ? 'Project' : 
+                           event.type === 'task' ? 'Task' : 'Calendar Event';
+            
             card.innerHTML = `
-                <div>
-                    <div class="event-name">${event.title}</div>
-                    <div class="event-date">${event.start_date || event.due_date} • ${event.type === 'project' ? 'Project' : 'Task'}${event.type === 'task' ? ` • ${event.project}` : ''}</div>
-                </div>
-                ${event.link ? `<a href="${event.link}" target="_blank" class="event-link">Open</a>` : ''}
+                <div class="event-name">${event.title}</div>
+                <div class="event-date">${eventDate}</div>
+                ${event.project ? `<div class="event-meta">${event.project}</div>` : ''}
+                ${badges ? `<div class="event-meta">${badges}</div>` : ''}
             `;
             eventsList.appendChild(card);
         });
@@ -157,6 +947,20 @@
         renderUpcomingEvents();
     }
 
+    // Close modal when clicking outside
+    eventModal.addEventListener('click', function(e) {
+        if (e.target === eventModal) {
+            closeEventModal();
+        }
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeEventModal();
+        }
+    });
+
     prevButton.addEventListener('click', () => {
         currentDate.setMonth(currentDate.getMonth() - 1);
         renderCalendar();
@@ -167,6 +971,8 @@
         renderCalendar();
     });
 
+    // Refresh calendar every 30 seconds to sync with Google Calendar
     refreshCalendar();
+    setInterval(refreshCalendar, 30000);
 </script>
 {% endblock %}
