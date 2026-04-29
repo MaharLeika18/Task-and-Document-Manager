@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, redirect, render_template, request, send_file, session
 from datetime import datetime
+import io
+from googleapiclient.http import MediaIoBaseDownload
 from .decorators import auth_required
 from .google_drive_services import (
     create_drive_folder,
@@ -7,6 +9,7 @@ from .google_drive_services import (
     get_drive_file_metadata,
     list_drive_items,
     upload_file_to_drive,
+    gdrive_service,
 )
 from .google_services import (
     get_project_file_references,
@@ -45,7 +48,8 @@ def list_files_route():
     items = list_drive_items(folder_id)
     references = None
     if project_uid:
-        references = get_project_file_references(project_uid, user_uid)
+        references_result = get_project_file_references(project_uid, user_uid)
+        references = references_result if references_result.get('success') else None
 
     return jsonify({'success': True, 'items': items, 'references': references})
 
@@ -137,11 +141,126 @@ def view_file_route(file_id):
         return jsonify(result), 404
 
     file_data = result['file']
-    target = file_data.get('web_view_link') or file_data.get('web_content_link')
+    mime_type = file_data.get('mime_type', '')
+    
+    # Try to use Google's preview capability for files that support it
+    # Google Drive can preview most file types via webViewLink or preview URL
+    web_view_link = file_data.get('web_view_link')
+    web_content_link = file_data.get('web_content_link')
+    
+    # For Google Docs/Sheets/Slides, use webViewLink
+    if 'google-apps' in mime_type:
+        target = web_view_link
+    # For PDF and images, try webContentLink first, then webViewLink
+    elif mime_type in ['application/pdf'] or mime_type.startswith('image/'):
+        target = web_content_link or web_view_link
+    # For Office documents, embed them in an iframe via Google Viewer
+    elif any(fmt in mime_type for fmt in ['word', 'spreadsheet', 'presentation']) or \
+         any(ext in mime_type for ext in ['.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt']):
+        # Use Google Docs viewer for Office documents
+        if web_content_link:
+            preview_url = f"https://docs.google.com/viewer?url={web_content_link}&embedded=true"
+            return render_template('preview.html', preview_url=preview_url, file_name=file_data.get('name', 'Document'))
+        target = web_view_link
+    # For other file types, try webViewLink (Google Drive preview)
+    else:
+        target = web_view_link or web_content_link
+    
     if not target:
-        return jsonify({'success': False, 'message': 'No preview link available'}), 404
-
+        # If no preview link, try to create a preview URL with Google Docs Viewer
+        download_link = f"/files/download/{file_id}"
+        preview_url = f"https://docs.google.com/viewer?url={request.host_url.rstrip('/')}{download_link}&embedded=true"
+        return render_template('preview.html', preview_url=preview_url, file_name=file_data.get('name', 'Document'))
+    
     return redirect(target)
+
+
+@files_bp.route('/api/export/<file_id>', methods=['GET'])
+@auth_required
+def export_file_route(file_id):
+    """Get export link for Google Docs/Sheets/Slides."""
+    result = get_drive_file_metadata(file_id)
+    if not result.get('success'):
+        return jsonify(result), 404
+    
+    file_data = result['file']
+    mime_type = file_data.get('mime_type', '')
+    
+    # Map Google Docs types to export MIME types
+    export_formats = {
+        'application/vnd.google-apps.document': 'application/pdf',  # or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        'application/vnd.google-apps.spreadsheet': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.google-apps.presentation': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    }
+    
+    export_mime = export_formats.get(mime_type)
+    if not export_mime:
+        return jsonify({'success': False, 'message': 'File type does not support export'}), 400
+    
+    try:
+        service = gdrive_service()
+        export_url = service.files().get_media(fileId=file_id).getbytes
+        # Construct the Google Drive export URL
+        export_link = f"https://www.googleapis.com/drive/v3/files/{file_id}/export?mimeType={export_mime}"
+        return jsonify({
+            'success': True,
+            'export_url': export_link,
+            'export_mime': export_mime,
+            'file_name': file_data.get('name', 'document')
+        })
+    except Exception as error:
+        print(f'Error generating export link: {error}')
+        return jsonify({'success': False, 'message': str(error)}), 500
+
+
+@files_bp.route('/download/export/<file_id>', methods=['GET'])
+@auth_required
+def download_export_route(file_id):
+    """Download an exported copy of a Google Doc/Sheet/Slide."""
+    export_format = request.args.get('format', 'pdf').lower()
+    
+    # Map format strings to MIME types
+    format_map = {
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    }
+    
+    export_mime = format_map.get(export_format, 'application/pdf')
+    
+    try:
+        service = gdrive_service()
+        metadata = service.files().get(fileId=file_id, fields='name,mimeType').execute()
+        
+        request_obj = service.files().export_media(fileId=file_id, mimeType=export_mime)
+        output = io.BytesIO()
+        downloader = MediaIoBaseDownload(output, request_obj)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        
+        output.seek(0)
+        filename = metadata.get('name', 'exported-file')
+        ext_map = {
+            'application/pdf': '.pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+        }
+        
+        if not any(filename.endswith(ext) for ext in ext_map.values()):
+            filename += ext_map.get(export_mime, '')
+        
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=export_mime
+        )
+    except Exception as error:
+        print(f'Error downloading exported file: {error}')
+        return jsonify({'success': False, 'message': str(error)}), 500
 
 
 @files_bp.route('/download/<file_id>', methods=['GET'])
@@ -151,9 +270,47 @@ def download_file_route(file_id):
     if not result.get('success'):
         return jsonify(result), 404
 
+    mime_type = result['mime_type']
+    filename = result['filename']
+    
+    # Ensure proper MIME types for common document formats
+    mime_type_map = {
+        '.pdf': 'application/pdf',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.ppt': 'application/vnd.ms-powerpoint',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        '.txt': 'text/plain',
+        '.csv': 'text/csv',
+        '.json': 'application/json',
+        '.xml': 'application/xml',
+        '.html': 'text/html',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.zip': 'application/zip',
+        '.rar': 'application/x-rar-compressed',
+        '.7z': 'application/x-7z-compressed',
+    }
+    
+    # Check for extension-based MIME type override
+    for ext, mime in mime_type_map.items():
+        if filename.lower().endswith(ext):
+            mime_type = mime
+            break
+    
+    # If still no MIME type, default to octet-stream
+    if not mime_type:
+        mime_type = 'application/octet-stream'
+
     return send_file(
         result['file_obj'],
         as_attachment=True,
-        download_name=result['filename'],
-        mimetype=result['mime_type']
+        download_name=filename,
+        mimetype=mime_type
     )

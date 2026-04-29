@@ -50,17 +50,45 @@ def gdrive_service():
 
 
 def _serialize_drive_item(item):
+    mime_type = item.get('mimeType', '')
+    file_name = item.get('name', '')
+    
     return {
         'file_id': item.get('id', ''),
-        'name': item.get('name', ''),
-        'mime_type': item.get('mimeType', ''),
+        'name': file_name,
+        'mime_type': mime_type,
         'size': item.get('size', '0'),
         'modified_time': item.get('modifiedTime', ''),
         'web_view_link': item.get('webViewLink', ''),
         'web_content_link': item.get('webContentLink', ''),
         'icon_link': item.get('iconLink', ''),
-        'is_folder': item.get('mimeType') == 'application/vnd.google-apps.folder'
+        'is_folder': mime_type == 'application/vnd.google-apps.folder',
+        'is_exportable': _is_exportable_format(mime_type, file_name)
     }
+
+
+def _is_exportable_format(mime_type, file_name):
+    """Check if a file can be exported/previewed by Google Drive."""
+    exportable_mimes = [
+        'application/vnd.google-apps.document',
+        'application/vnd.google-apps.spreadsheet',
+        'application/vnd.google-apps.presentation',
+        'application/vnd.google-apps.form',
+        'application/vnd.google-apps.drawing',
+    ]
+    
+    exportable_extensions = [
+        '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+        '.txt', '.csv', '.json', '.xml', '.html',
+        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg',
+        '.zip', '.rar', '.7z'
+    ]
+    
+    if mime_type in exportable_mimes:
+        return True
+    
+    file_name_lower = (file_name or '').lower()
+    return any(file_name_lower.endswith(ext) for ext in exportable_extensions)
 
 
 def list_drive_items(folder_id=None):

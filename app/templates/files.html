@@ -78,10 +78,44 @@
 
     function iconForFile(file) {
         if (file.is_folder) return 'FOLDER';
-        if ((file.mime_type || '').includes('image/')) return 'IMAGE';
-        if ((file.mime_type || '').includes('pdf')) return 'PDF';
-        if ((file.mime_type || '').includes('spreadsheet') || (file.name || '').endsWith('.xlsx')) return 'SHEET';
-        if ((file.mime_type || '').includes('wordprocessingml') || (file.name || '').endsWith('.docx')) return 'DOC';
+        const name = (file.name || '').toLowerCase();
+        const mime = (file.mime_type || '').toLowerCase();
+        
+        // Images
+        if (mime.includes('image/')) return 'IMAGE';
+        
+        // PDF
+        if (mime.includes('pdf')) return 'PDF';
+        
+        // Office Documents
+        if (mime.includes('spreadsheet') || name.endsWith('.xlsx') || name.endsWith('.xls') || 
+            mime.includes('sheet') || mime.includes('ms-excel')) return 'SHEET';
+        
+        if (mime.includes('wordprocessingml') || mime.includes('word') || mime.includes('document') ||
+            name.endsWith('.docx') || name.endsWith('.doc')) return 'DOC';
+        
+        if (mime.includes('presentation') || mime.includes('powerpoint') || 
+            name.endsWith('.pptx') || name.endsWith('.ppt')) return 'SLIDE';
+        
+        // Text files
+        if (mime.includes('text') || name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json')) return 'TEXT';
+        
+        // Archive
+        if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z') || 
+            mime.includes('archive') || mime.includes('zip')) return 'ZIP';
+        
+        // Code
+        if (mime.includes('text/plain') || name.endsWith('.js') || name.endsWith('.py') || 
+            name.endsWith('.java') || name.endsWith('.cpp') || name.endsWith('.html')) return 'CODE';
+        
+        // Google Docs
+        if (mime.includes('google-apps')) {
+            if (mime.includes('document')) return 'DOC';
+            if (mime.includes('spreadsheet')) return 'SHEET';
+            if (mime.includes('presentation')) return 'SLIDE';
+            return 'GDOCS';
+        }
+        
         return 'FILE';
     }
 
@@ -153,8 +187,10 @@
 
     function renderReferences(payload) {
         referencesList.innerHTML = '';
+        
+        // If no payload or empty, show help text
         if (!payload || !payload.success) {
-            referencesList.innerHTML = '<p class="empty-state">No project selected.</p>';
+            referencesList.innerHTML = '<p class="empty-state">No project selected or no files linked yet.</p>';
             return;
         }
 
@@ -163,21 +199,45 @@
 
         const blocks = [];
         if (projectFiles.length) {
+            const filesList = projectFiles.map(file => {
+                const iconType = file.mime_type && file.mime_type.includes('pdf') ? 'PDF' : 
+                                 file.mime_type && file.mime_type.includes('image') ? 'IMAGE' :
+                                 file.mime_type && file.mime_type.includes('word') ? 'DOC' :
+                                 file.mime_type && file.mime_type.includes('spreadsheet') ? 'SHEET' : 'FILE';
+                return `<li>
+                    <span class="file-icon">${iconType}</span>
+                    <a href="/files/view/${file.file_id}" target="_blank" title="${file.name}">${file.name}</a>
+                    <span class="file-size">${formatBytes(file.size)}</span>
+                </li>`;
+            }).join('');
             blocks.push(`
                 <div class="reference-block">
-                    <h3>Project Files</h3>
-                    <ul>${projectFiles.map(file => `<li><a href="/files/view/${file.file_id}" target="_blank">${file.name}</a></li>`).join('')}</ul>
+                    <h3>Project Files (${projectFiles.length})</h3>
+                    <ul class="reference-file-list">${filesList}</ul>
                 </div>
             `);
         }
 
         taskFiles.forEach(task => {
-            blocks.push(`
-                <div class="reference-block">
-                    <h3>${task.task_name}</h3>
-                    <ul>${(task.files || []).map(file => `<li><a href="/files/view/${file.file_id}" target="_blank">${file.name}</a></li>`).join('')}</ul>
-                </div>
-            `);
+            if (task.files && task.files.length) {
+                const filesList = task.files.map(file => {
+                    const iconType = file.mime_type && file.mime_type.includes('pdf') ? 'PDF' : 
+                                     file.mime_type && file.mime_type.includes('image') ? 'IMAGE' :
+                                     file.mime_type && file.mime_type.includes('word') ? 'DOC' :
+                                     file.mime_type && file.mime_type.includes('spreadsheet') ? 'SHEET' : 'FILE';
+                    return `<li>
+                        <span class="file-icon">${iconType}</span>
+                        <a href="/files/view/${file.file_id}" target="_blank" title="${file.name}">${file.name}</a>
+                        <span class="file-size">${formatBytes(file.size)}</span>
+                    </li>`;
+                }).join('');
+                blocks.push(`
+                    <div class="reference-block">
+                        <h3>${task.task_name} (${task.files.length})</h3>
+                        <ul class="reference-file-list">${filesList}</ul>
+                    </div>
+                `);
+            }
         });
 
         if (!blocks.length) {
@@ -192,7 +252,12 @@
         statusEl.textContent = 'Loading files...';
         try {
             const projectUid = getSelectedProjectUid();
-            const response = await fetch(`/files/api/list${projectUid ? `?project_uid=${encodeURIComponent(projectUid)}` : ''}`);
+            const url = new URL('/files/api/list', window.location.origin);
+            if (projectUid) {
+                url.searchParams.append('project_uid', projectUid);
+            }
+            
+            const response = await fetch(url);
             const data = await response.json();
             if (!data.success) {
                 statusEl.textContent = data.message || 'Could not load files.';
@@ -202,10 +267,17 @@
             allFiles = data.items || [];
             statusEl.textContent = `${allFiles.length} item(s) loaded from Google Drive.`;
             applySearch();
-            renderReferences(data.references);
+            
+            // Render references - pass the data directly from the response
+            if (data.references) {
+                renderReferences(data.references);
+            } else {
+                renderReferences(null);
+            }
         } catch (error) {
             console.error(error);
             statusEl.textContent = 'Error loading files. Check Drive credentials and folder access.';
+            renderReferences(null);
         }
     }
 
