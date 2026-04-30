@@ -7,19 +7,20 @@
 
 body {
     font-family: 'Fredoka', sans-serif;
-    background-color: #f8f9fa;
-    color: #333;
+    background-color: #ECECEC;
+    color: #2d3748;
     line-height: 1.6;
+    scroll-behavior: smooth;
 }
 
 /* Navigation */
 .navbar {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
     padding: 0.75rem 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(3, 37, 140, 0.15);
     position: fixed;
     top: 0;
     left: 0;
@@ -63,25 +64,31 @@ body {
     border-radius: 25px 0 0 25px;
     outline: none;
     font-size: 0.9rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(255, 255, 255, 0.95);
 }
 
 .search-bar input:focus {
-    border-color: #667eea;
+    border-color: #03258C;
+    box-shadow: 0 0 0 4px rgba(3, 37, 140, 0.15);
 }
 
 .search-bar button {
     padding: 0.5rem 1rem;
-    background: #667eea;
+    background: #03258C;
     color: white;
-    border: 2px solid #667eea;
+    border: 2px solid #03258C;
     border-left: none;
     border-radius: 0 25px 25px 0;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
 }
 
 .search-bar button:hover {
-    background: #5a67d8;
+    background: #143C8C;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(3, 37, 140, 0.2);
 }
 
 .utilities {
@@ -98,14 +105,16 @@ body {
     cursor: pointer;
     padding: 0.5rem;
     border-radius: 50%;
-    transition: background-color 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
 }
 
 .notification-button:hover,
 .mail-button:hover,
 .profile-button:hover {
-    background-color: rgba(255,255,255,0.2);
+    background-color: rgba(255,255,255,0.25);
+    transform: scale(1.08) rotate(5deg);
+    box-shadow: 0 4px 12px rgba(3, 37, 140, 0.2);
 }
 
 .profile-button img {
@@ -144,14 +153,20 @@ body {
     text-decoration: none;
     color: #666;
     border-radius: 8px;
-    transition: all 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     font-weight: 500;
+    border-left: 3px solid transparent;
+    position: relative;
 }
 
 .buttons a:hover,
 .buttons a.active {
-    background: #667eea;
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
     color: white;
+    border-left-color: white;
+    padding-left: 1.2rem;
+    box-shadow: 0 4px 12px rgba(3, 37, 140, 0.2);
+    transform: translateX(4px);
 }
 
 .dailies {
@@ -223,9 +238,10 @@ body {
     max-width: 960px;
     margin: 2rem auto;
     background: white;
-    padding: 1.75rem;
+    padding: 2rem;
     border-radius: 24px;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 12px 40px rgba(3, 37, 140, 0.12);
+    border: 1px solid rgba(3, 37, 140, 0.08);
 }
 
 .calendar-header {
@@ -237,27 +253,34 @@ body {
 }
 
 .calendar-header button {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
     border: none;
-    border-radius: 14px;
-    background: #667eea;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
     color: white;
     cursor: pointer;
-    transition: background 0.25s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: grid;
     place-items: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 12px rgba(3, 37, 140, 0.2);
 }
 
 .calendar-header button:hover {
-    background: #5a67d8;
+    background: linear-gradient(135deg, #143C8C 0%, #163573 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(3, 37, 140, 0.3);
 }
 
 #calendar-title,
 .calendar-title {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     font-weight: 700;
-    color: #2c3e8f;
+    color: #03258C;
+    text-align: center;
+    flex: 1;
 }
 
 .calendar-grid,
@@ -268,28 +291,32 @@ body {
 }
 
 .day-header {
-    padding: 0.85rem 0.5rem;
+    padding: 1rem 0.5rem;
     text-align: center;
     font-weight: 700;
-    color: #4f6bb0;
-    background: #eef3ff;
+    color: white;
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
     border-radius: 14px;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
 }
 
 .calendar-day {
-    min-height: 110px;
-    padding: 0.85rem;
-    background: #f8fbff;
-    border-radius: 20px;
-    border: 1px solid #e9eef8;
+    min-height: 120px;
+    padding: 1rem;
+    background: #fafbfc;
+    border-radius: 16px;
+    border: 2px solid rgba(3, 37, 140, 0.08);
     color: #2c3e50;
     position: relative;
-    transition: transform 0.2s ease, background 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .calendar-day:hover {
-    transform: translateY(-3px);
-    background: #eef3ff;
+    transform: translateY(-4px);
+    background: #f5f8fe;
+    border-color: rgba(3, 37, 140, 0.2);
+    box-shadow: 0 8px 20px rgba(3, 37, 140, 0.12);
 }
 
 .calendar-day .day-number {
@@ -305,13 +332,14 @@ body {
 
 .event-pill {
     display: inline-block;
-    padding: 0.3rem 0.55rem;
+    padding: 0.4rem 0.7rem;
     border-radius: 999px;
-    background: #667eea;
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
     color: white;
     font-size: 0.75rem;
     line-height: 1.2;
     white-space: nowrap;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
@@ -422,16 +450,18 @@ body {
 
 .card {
     background: white;
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 2rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     text-align: center;
-    transition: transform 0.3s, box-shadow 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid rgba(3, 37, 140, 0.1);
 }
 
 .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    transform: translateY(-8px);
+    box-shadow: 0 12px 35px rgba(3, 37, 140, 0.2);
+    border-color: #03258C;
 }
 
 .card h3 {
@@ -645,17 +675,20 @@ body {
 
 .project-card {
     background: white;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 1rem;
     margin-bottom: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
+    border: 2px solid rgba(3, 37, 140, 0.1);
 }
 
 .project-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(3, 37, 140, 0.2);
+    border-color: #03258C;
+    background: rgba(3, 37, 140, 0.02);
 }
 
 .project-card h4 {
@@ -693,23 +726,27 @@ body {
     background: white;
     padding: 1.5rem;
     border-radius: 18px;
-    box-shadow: 0 12px 24px rgba(0,0,0,0.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid rgba(3, 37, 140, 0.1);
 }
 
 .member-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 32px rgba(0,0,0,0.08);
+    transform: translateY(-6px);
+    box-shadow: 0 16px 35px rgba(3, 37, 140, 0.2);
+    border-color: #03258C;
+    background: rgba(3, 37, 140, 0.02);
 }
 
 .member-avatar {
     width: 72px;
     height: 72px;
     border-radius: 18px;
-    background: #eef3ff;
+    background: linear-gradient(135deg, rgba(3, 37, 140, 0.1) 0%, rgba(20, 60, 140, 0.1) 100%);
     display: grid;
     place-items: center;
     overflow: hidden;
+    border: 2px solid rgba(3, 37, 140, 0.15);
 }
 
 .member-avatar img {
@@ -852,17 +889,20 @@ body {
 
 .task-card {
     background: white;
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 0.75rem;
     margin-bottom: 0.5rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid rgba(3, 37, 140, 0.1);
 }
 
 .task-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(3, 37, 140, 0.15);
+    border-color: #03258C;
+    background: rgba(3, 37, 140, 0.02);
 }
 
 .task-card p {
@@ -970,7 +1010,6 @@ body {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
-}
     display: flex;
     justify-content: space-between;
     gap: 1rem;
@@ -1722,21 +1761,30 @@ body {
 }
 
 #email-reg {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
     color: white;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    font-weight: 600;
 }
 
 #email-reg:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(3, 37, 140, 0.4);
 }
 
 #google-reg {
-    background: #4285f4;
+    background: #143C8C;
     color: white;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    font-weight: 600;
 }
 
 #google-reg:hover {
-    background: #3367d6;
+    background: #03258C;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(3, 37, 140, 0.4);
 }
 
 .buttons-reg,
@@ -2191,4 +2239,678 @@ body {
     .members-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Additional UX Enhancements */
+
+/* Input styles */
+input,
+textarea,
+select {
+    background-color: #fafbfc;
+    border: 2px solid rgba(3, 37, 140, 0.1);
+    border-radius: 8px;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: white;
+}
+
+/* ===== STATUS COLOR CODING SYSTEM ===== */
+
+/* Status Badge Styles */
+.status-badge,
+.status,
+[class*="status"],
+.badge-status {
+    display: inline-block;
+    padding: 0.45rem 0.95rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1.5px solid;
+}
+
+/* Success/Completed Status - Green */
+.status-completed,
+.status-finished,
+.status-done,
+.status-success,
+.badge-success,
+[class*="completed"],
+[class*="finished"],
+[class*="done"],
+[class*="success"] {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.15) 0%, rgba(46, 204, 113, 0.08) 100%);
+    color: #27AE60;
+    border-color: rgba(39, 174, 96, 0.35);
+}
+
+.status-completed::before,
+.status-finished::before,
+.status-done::before,
+.status-success::before {
+    content: "✓ ";
+    font-weight: 700;
+    margin-right: 0.3rem;
+}
+
+/* In Progress/Current Status - Yellow/Orange */
+.status-progress,
+.status-current,
+.status-in-progress,
+.status-active,
+.status-pending,
+.badge-warning,
+[class*="progress"],
+[class*="current"],
+[class*="in-progress"],
+[class*="active"],
+[class*="pending"] {
+    background: linear-gradient(135deg, rgba(241, 196, 15, 0.15) 0%, rgba(243, 156, 18, 0.08) 100%);
+    color: #E67E22;
+    border-color: rgba(241, 196, 15, 0.4);
+}
+
+.status-progress::before,
+.status-current::before,
+.status-in-progress::before,
+.status-active::before,
+.status-pending::before {
+    content: "● ";
+    font-weight: 700;
+    margin-right: 0.3rem;
+}
+
+/* Urgent/Blocked/Failed Status - Red */
+.status-blocked,
+.status-failed,
+.status-urgent,
+.status-error,
+.status-overdue,
+.badge-danger,
+[class*="blocked"],
+[class*="failed"],
+[class*="urgent"],
+[class*="error"],
+[class*="overdue"] {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.15) 0%, rgba(192, 57, 43, 0.08) 100%);
+    color: #E74C3C;
+    border-color: rgba(231, 76, 60, 0.4);
+}
+
+.status-blocked::before,
+.status-failed::before,
+.status-urgent::before,
+.status-error::before,
+.status-overdue::before {
+    content: "⚠ ";
+    font-weight: 700;
+    margin-right: 0.3rem;
+}
+
+/* On Hold/Waiting Status - Blue */
+.status-hold,
+.status-waiting,
+.status-paused,
+.badge-info,
+[class*="hold"],
+[class*="waiting"],
+[class*="paused"] {
+    background: linear-gradient(135deg, rgba(3, 37, 140, 0.15) 0%, rgba(20, 60, 140, 0.08) 100%);
+    color: #03258C;
+    border-color: rgba(3, 37, 140, 0.35);
+}
+
+/* Status Indicator Dots */
+.status-indicator,
+.status-dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    animation: pulse 2.5s ease-in-out infinite;
+    vertical-align: middle;
+}
+
+.status-indicator.success,
+.status-dot.success {
+    background: linear-gradient(135deg, #27AE60 0%, #2ECC71 100%);
+    box-shadow: 0 0 0 4px rgba(39, 174, 96, 0.2);
+}
+
+.status-indicator.warning,
+.status-dot.warning {
+    background: linear-gradient(135deg, #F39C12 0%, #F1C40F 100%);
+    box-shadow: 0 0 0 4px rgba(243, 156, 18, 0.2);
+}
+
+.status-indicator.danger,
+.status-dot.danger {
+    background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
+    box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.2);
+}
+
+.status-indicator.info,
+.status-dot.info {
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
+    box-shadow: 0 0 0 4px rgba(3, 37, 140, 0.2);
+}
+
+/* Pulse animation for status indicators */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.75;
+        transform: scale(1.1);
+    }
+}
+
+/* Task Priority Colors - Left Border Indicators */
+.priority-high,
+.priority-critical,
+.priority-1 {
+    border-left: 5px solid #E74C3C;
+    padding-left: calc(0.75rem - 5px);
+}
+
+.priority-medium,
+.priority-normal,
+.priority-2 {
+    border-left: 5px solid #F39C12;
+    padding-left: calc(0.75rem - 5px);
+}
+
+.priority-low,
+.priority-3 {
+    border-left: 5px solid #27AE60;
+    padding-left: calc(0.75rem - 5px);
+}
+
+/* Project Category Styling with Status Colors */
+.project-category,
+.project-section {
+    padding: 1.5rem;
+    border-radius: 14px;
+    margin-bottom: 2rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid;
+}
+
+/* Current Projects - Yellow/Orange */
+.project-category.current,
+.project-section.current,
+[class*="current-projects"] {
+    background: linear-gradient(135deg, rgba(241, 196, 15, 0.08) 0%, rgba(243, 156, 18, 0.05) 100%);
+    border-color: rgba(241, 196, 15, 0.25);
+}
+
+/* Planning Projects - Blue */
+.project-category.planning,
+.project-section.planning,
+[class*="planning-projects"] {
+    background: linear-gradient(135deg, rgba(3, 37, 140, 0.08) 0%, rgba(20, 60, 140, 0.05) 100%);
+    border-color: rgba(3, 37, 140, 0.25);
+}
+
+/* Finished Projects - Green */
+.project-category.finished,
+.project-section.finished,
+[class*="finished-projects"] {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.08) 0%, rgba(46, 204, 113, 0.05) 100%);
+    border-color: rgba(39, 174, 96, 0.25);
+}
+
+/* Other Projects - Purple */
+.project-category.other,
+.project-section.other,
+[class*="other-projects"] {
+    background: linear-gradient(135deg, rgba(155, 89, 182, 0.08) 0%, rgba(155, 89, 182, 0.05) 100%);
+    border-color: rgba(155, 89, 182, 0.25);
+}
+
+/* Category Title Styling with Colored Underlines */
+.project-category h3,
+.project-category h2,
+.category-title,
+[class*="category"] > h3,
+[class*="section"] > h3 {
+    position: relative;
+    padding-bottom: 0.85rem;
+    margin-bottom: 1.25rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+.project-category.current h3::after,
+.project-category.current h2::after,
+.category-title.current::after,
+[class*="current"] > h3::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    height: 5px;
+    background: linear-gradient(90deg, #F39C12 0%, #F1C40F 100%);
+    border-radius: 3px;
+}
+
+.project-category.planning h3::after,
+.project-category.planning h2::after,
+.category-title.planning::after,
+[class*="planning"] > h3::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    height: 5px;
+    background: linear-gradient(90deg, #03258C 0%, #143C8C 100%);
+    border-radius: 3px;
+}
+
+.project-category.finished h3::after,
+.project-category.finished h2::after,
+.category-title.finished::after,
+[class*="finished"] > h3::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    height: 5px;
+    background: linear-gradient(90deg, #27AE60 0%, #2ECC71 100%);
+    border-radius: 3px;
+}
+
+.project-category.other h3::after,
+.project-category.other h2::after,
+.category-title.other::after,
+[class*="other"] > h3::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    height: 5px;
+    background: linear-gradient(90deg, #9B59B6 0%, #B833CC 100%);
+    border-radius: 3px;
+}
+
+/* Progress Bar Styling */
+.progress-bar,
+.progress,
+[class*="progress-bar"] {
+    height: 8px;
+    background: rgba(3, 37, 140, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0.75rem 0;
+}
+
+.progress-bar-fill,
+.progress-fill,
+[class*="progress-fill"] {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* High progress - Green */
+.progress-bar-fill.high,
+.progress-fill.high,
+[class*="progress"].high {
+    background: linear-gradient(90deg, #27AE60 0%, #2ECC71 100%);
+}
+
+/* Medium progress - Yellow/Orange */
+.progress-bar-fill.medium,
+.progress-fill.medium,
+[class*="progress"].medium {
+    background: linear-gradient(90deg, #F39C12 0%, #F1C40F 100%);
+}
+
+/* Low progress - Red */
+.progress-bar-fill.low,
+.progress-fill.low,
+[class*="progress"].low {
+    background: linear-gradient(90deg, #E74C3C 0%, #C0392B 100%);
+}
+
+/* Status text in cards */
+.task-status,
+.project-status,
+[class*="status-text"] {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Completed Task Styling */
+.task-completed,
+.task-card.completed,
+[class*="task"][class*="completed"] {
+    border-left: 5px solid #27AE60;
+    padding-left: calc(0.75rem - 5px);
+    background: rgba(39, 174, 96, 0.03);
+}
+
+/* In Progress Task Styling */
+.task-progress,
+.task-card.progress,
+[class*="task"][class*="progress"] {
+    border-left: 5px solid #F39C12;
+    padding-left: calc(0.75rem - 5px);
+    background: rgba(243, 156, 18, 0.03);
+}
+
+/* Blocked/Failed Task Styling */
+.task-blocked,
+.task-card.blocked,
+[class*="task"][class*="blocked"] {
+    border-left: 5px solid #E74C3C;
+    padding-left: calc(0.75rem - 5px);
+    background: rgba(231, 76, 60, 0.03);
+}
+
+/* Button hover states */
+button {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Primary buttons */
+button[type="submit"],
+.btn-primary {
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
+    color: white;
+}
+
+button[type="submit"]:hover,
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(3, 37, 140, 0.3);
+}
+
+/* Secondary buttons */
+button[type="button"],
+.btn-secondary {
+    background: #143C8C;
+    color: white;
+}
+
+button[type="button"]:hover,
+.btn-secondary:hover {
+    background: #03258C;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(3, 37, 140, 0.3);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Loading animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading::after {
+    content: '⏳';
+    display: inline-block;
+    animation: spin 1s linear infinite;
+    margin-left: 0.5rem;
+}
+
+/* Smooth transitions for all interactive elements */
+a,
+button,
+input,
+select,
+textarea {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced focus states for accessibility */
+*:focus-visible {
+    outline: 2px solid #03258C;
+    outline-offset: 2px;
+}
+
+/* Text selection styling */
+::selection {
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
+    color: white;
+}
+
+::-moz-selection {
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
+    color: white;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f5f7fc;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #03258C 0%, #143C8C 100%);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #143C8C 0%, #163573 100%);
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-color: #03258C #F2F2F2;
+    scrollbar-width: thin;
+}
+
+/* Hover effects for links */
+a {
+    color: #03258C;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+}
+
+a:hover {
+    color: #143C8C;
+    text-shadow: 0 0 10px rgba(3, 37, 140, 0.2);
+}
+
+/* Enhanced badge styling */
+.badge {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.badge:hover {
+    transform: scale(1.05);
+}
+
+/* Improve placeholder styling */
+input::placeholder,
+textarea::placeholder {
+    color: #b8c1d9;
+    font-style: italic;
+}
+
+/* Enhanced focus visible for form controls */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: none;
+    border-color: #03258C;
+    box-shadow: 0 0 0 4px rgba(3, 37, 140, 0.15);
+}
+
+/* Better label styling */
+label {
+    font-weight: 500;
+    color: #2d3748;
+    transition: color 0.2s ease;
+}
+
+label:hover {
+    color: #03258C;
+}
+
+/* Enhanced calendar day styling */
+.calendar-day {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.calendar-day:hover {
+    transform: scale(1.02);
+}
+
+/* Enhanced event pill animations */
+.event-pill {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.event-pill:hover {
+    transform: translateX(2px);
+}
+
+/* Better modal backdrop */
+.modal {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+/* Enhanced tooltip styling */
+[title] {
+    position: relative;
+}
+
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    background: #2d3748;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 0.5rem;
+    z-index: 1000;
+    animation: tooltipFade 0.3s ease-out;
+}
+
+@keyframes tooltipFade {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Section backgrounds and containers */
+section,
+.section,
+.container,
+.box,
+.panel {
+    background: white;
+}
+
+/* Upcoming events and sidebar sections */
+.upcoming-events,
+.right-sidebar,
+.sidebar-section,
+.card-section {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(3, 37, 140, 0.08);
+    border: 1px solid rgba(3, 37, 140, 0.08);
+}
+
+/* Form sections and modal backgrounds */
+.form-section,
+.modal-content,
+.dialog-content,
+.popup {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 25px rgba(3, 37, 140, 0.12);
+}
+
+/* List items and rows */
+.list-item,
+.row,
+.item {
+    background: white;
+    border-bottom: 1px solid rgba(3, 37, 140, 0.05);
+    transition: all 0.2s ease;
+}
+
+.list-item:hover,
+.row:hover,
+.item:hover {
+    background: rgba(3, 37, 140, 0.02);
+}
+
+/* Tab panels and content areas */
+.tab-content,
+.content-area,
+.panel-content {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+/* Improved input and form elements styling */
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+input::placeholder,
+textarea::placeholder,
+select {
+    color: #999;
+    font-style: italic;
+}
+
+/* Better select styling */
+select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23030258c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.5em;
+    padding-right: 2.5rem;
 }
