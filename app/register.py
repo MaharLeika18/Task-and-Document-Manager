@@ -1,6 +1,6 @@
 # hello_app/views.py
 from flask import Blueprint, jsonify, render_template, request, session, redirect, g
-from .firebase_run import db, auth
+from .firebase_run import db, auth, verify_id_token_with_retry
 from datetime import datetime
 from .session_id_generation import generate_secure_string
 # Create a blueprint named 'auth'
@@ -20,7 +20,7 @@ def register():
     token = request.json.get("token")
     user_data = request.json.get("user_data")
     try:
-        decoded = auth.verify_id_token(token)
+        decoded = verify_id_token_with_retry(token)
         session["uid"] = decoded["uid"]
         session["email"] = decoded.get("email")
         session["name"] = decoded.get("name")

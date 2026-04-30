@@ -775,6 +775,190 @@ def update_project_status(project_uid, new_status, user_uid):
         return {'success': False, 'message': str(e)}
 
 
+def update_project_details(project_uid, updated_data, user_uid):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            if project_data.get('project_uid') != project_uid:
+                continue
+
+            if user_uid not in project_data.get('assigned_members', []):
+                return {'success': False, 'message': 'Not authorized to update project details'}
+
+            status_to_update = updated_data.get('status')
+            if status_to_update and status_to_update != project_data.get('status'):
+                status_result = update_project_status(project_uid, status_to_update, user_uid)
+                if not status_result.get('success'):
+                    return status_result
+
+            update_data = {}
+            for key in ['project_name', 'project_description', 'priority', 'category', 'start_date', 'end_date', 'assigned_members']:
+                if updated_data.get(key) is not None:
+                    update_data[key] = updated_data.get(key)
+
+            if update_data:
+                update_data['last_updated'] = datetime.now().isoformat()
+                update_data['last_updated_by'] = user_uid
+                projects_ref.document(doc.id).update(update_data)
+
+            return {'success': True, 'message': 'Project details updated successfully'}
+
+        return {'success': False, 'message': 'Project not found'}
+
+    except Exception as e:
+        print(f'Error updating project details: {e}')
+        return {'success': False, 'message': str(e)}
+
+
+def update_task_details(project_uid, task_name, task_updates, user_uid):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            if project_data.get('project_uid') != project_uid:
+                continue
+
+            if user_uid not in project_data.get('assigned_members', []) and not any(user_uid in t.get('members', []) for t in project_data.get('tasks', [])):
+                return {'success': False, 'message': 'Not authorized to update task details'}
+
+            tasks = project_data.get('tasks', [])
+            task_found = False
+            for task in tasks:
+                if task.get('name') == task_name:
+                    task_found = True
+                    if user_uid not in task.get('members', []) and user_uid not in project_data.get('assigned_members', []):
+                        return {'success': False, 'message': 'Not authorized to update this task'}
+
+                    new_name = task_updates.get('name')
+                    new_priority = task_updates.get('priority')
+                    new_due_date = task_updates.get('due_date')
+                    new_members = task_updates.get('members')
+                    new_status = task_updates.get('status')
+
+                    old_status = task.get('status', 'todo')
+                    if new_status and new_status != old_status:
+                        valid_transitions = VALID_TASK_TRANSITIONS.get(old_status, [])
+                        if new_status not in valid_transitions:
+                            return {
+                                'success': False,
+                                'message': f'Cannot transition from "{old_status}" to "{new_status}". Valid transitions: {" | ".join(valid_transitions) if valid_transitions else "No transitions available (terminal state)"}'
+                            }
+                        task['status'] = new_status
+                        if 'status_history' not in task:
+                            task['status_history'] = []
+                        task['status_history'].append({
+                            'status': new_status,
+                            'changed_by': user_uid,
+                            'changed_at': datetime.now().isoformat(),
+                            'previous_status': old_status
+                        })
+                        if task.get('event_id'):
+                            update_task_event_status(task.get('event_id'), new_name or task.get('name'), project_data.get('project_name', ''), new_status)
+
+                    if new_name and new_name != task.get('name'):
+                        task['name'] = new_name
+
+                    if new_priority is not None:
+                        task['priority'] = new_priority
+
+                    if new_due_date is not None:
+                        task['due_date'] = new_due_date
+
+                    if isinstance(new_members, list):
+                        task['members'] = new_members
+                        if user_uid not in task['members']:
+                            task['members'].append(user_uid)
+
+                    task['last_updated'] = datetime.now().isoformat()
+                    task['last_updated_by'] = user_uid
+                    break
+
+            if not task_found:
+                return {'success': False, 'message': 'Task not found'}
+
+            doc_ref = projects_ref.document(doc.id)
+            doc_ref.update({'tasks': tasks})
+            return {'success': True, 'message': 'Task details updated successfully', 'task': task}
+
+        return {'success': False, 'message': 'Project not found'}
+
+    except Exception as e:
+        print(f'Error updating task details: {e}')
+        return {'success': False, 'message': str(e)}
+
+
+def delete_project(project_uid, user_uid):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            if project_data.get('project_uid') != project_uid:
+                continue
+
+            if user_uid not in project_data.get('assigned_members', []) and user_uid != project_data.get('project_maker_uid'):
+                return {'success': False, 'message': 'Not authorized to delete this project'}
+
+            projects_ref.document(doc.id).delete()
+            return {'success': True, 'message': 'Project deleted successfully'}
+
+        return {'success': False, 'message': 'Project not found'}
+
+    except Exception as e:
+        print(f'Error deleting project: {e}')
+        return {'success': False, 'message': str(e)}
+
+
+def delete_task(project_uid, task_name, user_uid):
+    try:
+        projects_ref = db.collection('projects')
+        docs = projects_ref.stream()
+
+        for doc in docs:
+            project_data = doc.to_dict()
+            if project_data.get('project_uid') != project_uid:
+                continue
+
+            tasks = project_data.get('tasks', [])
+            task_index = None
+            for index, task in enumerate(tasks):
+                if task.get('name') == task_name:
+                    task_index = index
+                    break
+
+            if task_index is None:
+                return {'success': False, 'message': 'Task not found'}
+
+            task = tasks[task_index]
+            if user_uid not in project_data.get('assigned_members', []) and user_uid not in task.get('members', []):
+                return {'success': False, 'message': 'Not authorized to delete this task'}
+
+            event_id = task.get('event_id')
+            if event_id:
+                try:
+                    service = gcalendar_service()
+                    service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+                except Exception as e:
+                    print(f'Warning: failed to delete Google Calendar event for task {task_name}: {e}')
+
+            tasks.pop(task_index)
+            doc_ref = projects_ref.document(doc.id)
+            doc_ref.update({'tasks': tasks})
+            return {'success': True, 'message': 'Task deleted successfully'}
+
+        return {'success': False, 'message': 'Project not found'}
+
+    except Exception as e:
+        print(f'Error deleting task: {e}')
+        return {'success': False, 'message': str(e)}
+
+
 def link_drive_file_to_project_task(project_uid, file_data, user_uid, task_name=None):
     try:
         file_id = file_data.get('file_id')

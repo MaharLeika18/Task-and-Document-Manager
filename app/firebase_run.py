@@ -3,6 +3,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore, auth
 import os
 import dotenv
+import time
 
 dotenv.load_dotenv()
 
@@ -20,7 +21,22 @@ def verify_firebase_token():
     id_token = auth_header.split(" ").pop()
 
     try:
-        decoded_token = auth.verify_id_token(id_token)
+        decoded_token = verify_id_token_with_retry(id_token)
         return decoded_token
     except:
         return None
+
+
+def verify_id_token_with_retry(id_token, max_attempts=3, retry_delay=1):
+    last_exception = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return auth.verify_id_token(id_token)
+        except Exception as e:
+            last_exception = e
+            message = str(e).lower()
+            if 'token used too early' in message and attempt < max_attempts:
+                time.sleep(retry_delay)
+                continue
+            raise
+    raise last_exception

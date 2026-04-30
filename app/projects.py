@@ -1,6 +1,6 @@
 from .google_services import (create_project_firestore, create_project_gcalendar, create_task_gcalendar, 
     get_project_by_uid, get_tasks_for_project_user, get_users, get_projects_for_user, update_task_status, 
-    add_task_to_project, update_project_status, TASK_STATUSES, PROJECT_STATUSES, 
+    add_task_to_project, update_project_status, update_project_details, update_task_details, delete_project, delete_task, TASK_STATUSES, PROJECT_STATUSES, 
     VALID_TASK_TRANSITIONS, VALID_PROJECT_TRANSITIONS, sync_task_to_google_calendar)
 from flask import Blueprint, render_template, redirect, session, url_for, request, jsonify
 from datetime import datetime
@@ -111,7 +111,10 @@ def update_task_status_route():
             project_name = project_data.get('project_name', 'Project')
             # Construct task event ID (typically project_uid_taskname)
             task_event_id = f"{project_uid}_{task_name}".replace(' ', '_')
-            sync_task_to_google_calendar(task_event_id, task_name, project_name, new_status)
+            # Get due date from task object returned in result
+            task_obj = result.get('task', {})
+            due_date = task_obj.get('due_date', '')
+            sync_task_to_google_calendar(task_event_id, task_name, project_name, new_status, due_date)
     
     return jsonify(result)
 
@@ -174,6 +177,79 @@ def update_project_status_route():
         return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
     result = update_project_status(project_uid, new_status, user_uid)
+    return jsonify(result)
+
+@projects_bp.route('/update_project_details', methods=['POST'])
+@auth_required
+def update_project_details_route():
+    data = request.json
+    project_uid = data.get('project_uid')
+    user_uid = session['uid']
+
+    if not project_uid:
+        return jsonify({'success': False, 'message': 'Missing project UID'}), 400
+
+    updated_data = {
+        'project_name': data.get('project_name'),
+        'project_description': data.get('project_description'),
+        'status': data.get('status'),
+        'priority': data.get('priority'),
+        'category': data.get('category'),
+        'start_date': data.get('start_date'),
+        'end_date': data.get('end_date'),
+        'assigned_members': data.get('assigned_members')
+    }
+
+    result = update_project_details(project_uid, updated_data, user_uid)
+    return jsonify(result)
+
+@projects_bp.route('/update_task_details', methods=['POST'])
+@auth_required
+def update_task_details_route():
+    data = request.json
+    project_uid = data.get('project_uid')
+    task_name = data.get('task_name')
+    user_uid = session['uid']
+
+    if not all([project_uid, task_name]):
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+
+    updates = {
+        'name': data.get('name'),
+        'priority': data.get('priority'),
+        'due_date': data.get('due_date'),
+        'members': data.get('members'),
+        'status': data.get('status')
+    }
+
+    result = update_task_details(project_uid, task_name, updates, user_uid)
+    return jsonify(result)
+
+@projects_bp.route('/delete_project', methods=['POST'])
+@auth_required
+def delete_project_route():
+    data = request.json
+    project_uid = data.get('project_uid')
+    user_uid = session['uid']
+
+    if not project_uid:
+        return jsonify({'success': False, 'message': 'Missing project UID'}), 400
+
+    result = delete_project(project_uid, user_uid)
+    return jsonify(result)
+
+@projects_bp.route('/delete_task', methods=['POST'])
+@auth_required
+def delete_task_route():
+    data = request.json
+    project_uid = data.get('project_uid')
+    task_name = data.get('task_name')
+    user_uid = session['uid']
+
+    if not all([project_uid, task_name]):
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+
+    result = delete_task(project_uid, task_name, user_uid)
     return jsonify(result)
 
 @projects_bp.route('/get_project_tasks/<project_uid>', methods=['GET'])

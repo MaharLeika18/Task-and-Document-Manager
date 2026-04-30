@@ -118,11 +118,11 @@
                 <div class="project-column" id="col-current">
                     <div class="column-header">CURRENT PROJECTS</div>
                     {% for project in projects %}
-                        {% if project.status == 'current' %}
+                        {% if project.status in ['active', 'on-hold'] %}
                             <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
                                 <div class="project-card-meta">
-                                    <span class="badge">{{ project.status|capitalize }}</span>
+                                    <span class="badge">{{ project.status|replace('-', ' ')|capitalize }}</span>
                                     <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
                                     <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
                                 </div>
@@ -134,13 +134,13 @@
 
                 <!-- UPCOMING -->
                 <div class="project-column" id="col-upcoming">
-                    <div class="column-header">UPCOMING <span>(WAITING FOR APPROVAL)</span></div>
+                    <div class="column-header">PLANNING</div>
                     {% for project in projects %}
-                        {% if project.status == 'upcoming' %}
+                        {% if project.status == 'planning' %}
                             <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
                                 <div class="project-card-meta">
-                                    <span class="badge">{{ project.status|capitalize }}</span>
+                                    <span class="badge">{{ project.status|replace('-', ' ')|capitalize }}</span>
                                     <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
                                     <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
                                 </div>
@@ -154,11 +154,29 @@
                 <div class="project-column" id="col-finished">
                     <div class="column-header">FINISHED</div>
                     {% for project in projects %}
-                        {% if project.status == 'finished' %}
+                        {% if project.status in ['completed', 'cancelled'] %}
                             <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
                                 <h4>{{ project.project_name }}</h4>
                                 <div class="project-card-meta">
-                                    <span class="badge">{{ project.status|capitalize }}</span>
+                                    <span class="badge">{{ project.status|replace('-', ' ')|capitalize }}</span>
+                                    <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
+                                    <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
+                                </div>
+                                <p>{{ project.project_description }}</p>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <!-- OTHER PROJECTS (catch-all for any other statuses) -->
+                <div class="project-column" id="col-other">
+                    <div class="column-header">OTHER PROJECTS</div>
+                    {% for project in projects %}
+                        {% if project.status not in ['active', 'on-hold', 'planning', 'completed', 'cancelled'] or project.status is none %}
+                            <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
+                                <h4>{{ project.project_name }}</h4>
+                                <div class="project-card-meta">
+                                    <span class="badge">{{ project.status|replace('-', ' ')|capitalize if project.status else 'No Status' }}</span>
                                     <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
                                     <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
                                 </div>
@@ -169,13 +187,23 @@
                 </div>
 
             </div>
+            {% if projects|length == 0 %}
+            <div style="text-align: center; padding: 3rem; color: #999;">
+                <p>No projects yet. <a href="#" onclick="openModal(); return false;" style="color: #0066cc;">Create one</a> to get started!</p>
+            </div>
+            {% endif %}
         </div>
 
         <!-- TASK VIEW (hidden until a project is clicked) -->
         <div id="project-task-view" style="display: none;">
 
             <div class="task-view-header">
-                <button type="button" onclick="closeProject()">← BACK TO PROJECTS</button>
+                <div class="task-view-actions">
+                    <button type="button" onclick="closeProject()">← BACK TO PROJECTS</button>
+                    <button type="button" class="edit-project-btn" onclick="showEditProjectModal()">✎ Edit Project</button>
+                    <button type="button" class="edit-project-btn" onclick="showProjectStatusPopup()">⚙️ Change Status</button>
+                    <button type="button" class="delete-project-btn" onclick="confirmDeleteProject()">🗑️ Delete Project</button>
+                </div>
                 <div>
                     <span>TODAY'S DATE</span>
                     <strong id="task-view-date"></strong>
@@ -250,8 +278,12 @@
                         <div id="tasks-in-progress"></div>
                     </div>
                     <div class="task-column">
-                        <div class="column-header">REVIEW</div>
+                        <div class="column-header">IN REVIEW</div>
                         <div id="tasks-review"></div>
+                    </div>
+                    <div class="task-column">
+                        <div class="column-header">BLOCKED</div>
+                        <div id="tasks-blocked"></div>
                     </div>
                     <div class="task-column">
                         <div class="column-header">DONE</div>
@@ -345,7 +377,7 @@
             <select name="tasks[${taskCount}][status]">
                 <option value="todo">To Do</option>
                 <option value="in-progress">In Progress</option>
-                <option value="review">Review</option>
+                <option value="in-review">In Review</option>
                 <option value="done">Done</option>
             </select>
 
@@ -422,6 +454,322 @@
         }).join(' | ');
     }
 
+    function showEditProjectModal() {
+        if (!currentProject) return;
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        const memberCheckboxes = ALL_MEMBERS.map(member => `
+            <label class="modal-checkbox-label">
+                <input type="checkbox" name="assigned_members" value="${member.uid}" ${currentProject.assigned_members.includes(member.uid) ? 'checked' : ''}>
+                ${member.name}
+            </label>
+        `).join('');
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Project</h2>
+                    <button class="modal-close" type="button">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-project-form">
+                        <label>Project Name</label>
+                        <input type="text" id="edit-project-name" value="${currentProject.project_name}" required>
+
+                        <label>Description</label>
+                        <textarea id="edit-project-description" rows="4">${currentProject.project_description || ''}</textarea>
+
+                        <label>Status</label>
+                        <select id="edit-project-status">
+                            <option value="planning">Planning</option>
+                            <option value="active">Active</option>
+                            <option value="on-hold">On Hold</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+
+                        <label>Priority</label>
+                        <select id="edit-project-priority">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+
+                        <label>Category</label>
+                        <select id="edit-project-category">
+                            <option value="ces">Community Extension Services Project</option>
+                            <option value="seminar">Seminar</option>
+                            <option value="competition">Competition</option>
+                            <option value="general-assembly">General Assembly</option>
+                        </select>
+
+                        <label>Start Date</label>
+                        <input type="date" id="edit-project-start" value="${currentProject.start_date || ''}">
+
+                        <label>End Date</label>
+                        <input type="date" id="edit-project-end" value="${currentProject.end_date || ''}">
+
+                        <label>Assigned Members</label>
+                        <div class="modal-checkbox-group">${memberCheckboxes}</div>
+
+                        <button type="submit">Save Changes</button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+
+        const statusSelect = modal.querySelector('#edit-project-status');
+        if (statusSelect) {
+            statusSelect.value = currentProject.status || 'planning';
+        }
+        const prioritySelect = modal.querySelector('#edit-project-priority');
+        if (prioritySelect) {
+            prioritySelect.value = currentProject.priority || 'medium';
+        }
+        const categorySelect = modal.querySelector('#edit-project-category');
+        if (categorySelect) {
+            categorySelect.value = currentProject.category || 'ces';
+        }
+
+        modal.querySelector('#edit-project-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const assigned_members = Array.from(modal.querySelectorAll('input[name="assigned_members"]:checked')).map(input => input.value);
+            updateProjectDetails({
+                project_uid: currentProjectUid,
+                project_name: modal.querySelector('#edit-project-name').value,
+                project_description: modal.querySelector('#edit-project-description').value,
+                status: modal.querySelector('#edit-project-status').value,
+                priority: modal.querySelector('#edit-project-priority').value,
+                category: modal.querySelector('#edit-project-category').value,
+                start_date: modal.querySelector('#edit-project-start').value,
+                end_date: modal.querySelector('#edit-project-end').value,
+                assigned_members
+            });
+            modal.remove();
+        });
+    }
+
+    function showEditTaskModal(task) {
+        if (!currentProjectUid || !task) return;
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        const taskMembers = ALL_MEMBERS.map(member => `
+            <label class="modal-checkbox-label">
+                <input type="checkbox" name="task_members" value="${member.uid}" ${task.members.includes(member.uid) ? 'checked' : ''}>
+                ${member.name}
+            </label>
+        `).join('');
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Task</h2>
+                    <button class="modal-close" type="button">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-task-form">
+                        <label>Task Name</label>
+                        <input type="text" id="edit-task-name" value="${task.name}" required>
+
+                        <label>Priority</label>
+                        <select id="edit-task-priority">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+
+                        <label>Status</label>
+                        <select id="edit-task-status">
+                            <option value="todo">To Do</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="in-review">In Review</option>
+                            <option value="done">Done</option>
+                            <option value="blocked">Blocked</option>
+                        </select>
+
+                        <label>Due Date</label>
+                        <input type="date" id="edit-task-due" value="${task.due_date || ''}">
+
+                        <label>Assigned Members</label>
+                        <div class="modal-checkbox-group">${taskMembers}</div>
+
+                        <button type="submit">Save Task</button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+
+        modal.querySelector('#edit-task-priority').value = task.priority || 'medium';
+        modal.querySelector('#edit-task-status').value = task.status || 'todo';
+
+        modal.querySelector('#edit-task-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const members = Array.from(modal.querySelectorAll('input[name="task_members"]:checked')).map(input => input.value);
+            updateTaskDetails({
+                project_uid: currentProjectUid,
+                task_name: task.name,
+                name: modal.querySelector('#edit-task-name').value,
+                priority: modal.querySelector('#edit-task-priority').value,
+                status: modal.querySelector('#edit-task-status').value,
+                due_date: modal.querySelector('#edit-task-due').value,
+                members
+            });
+            modal.remove();
+        });
+    }
+
+    function updateProjectDetails(payload) {
+        fetch('/projects/update_project_details', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatusNotification(data.message, 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showStatusNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error updating project details:', error);
+            showStatusNotification('Error updating project details', 'error');
+        });
+    }
+
+    function updateTaskDetails(payload) {
+        fetch('/projects/update_task_details', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatusNotification(data.message, 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showStatusNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error updating task details:', error);
+            showStatusNotification('Error updating task details', 'error');
+        });
+    }
+
+    function confirmDeleteProject() {
+        if (!currentProjectUid) return;
+        if (!confirm('Delete this project and all its tasks? This action cannot be undone.')) {
+            return;
+        }
+        deleteProject(currentProjectUid);
+    }
+
+    function deleteProject(projectUid) {
+        fetch('/projects/delete_project', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ project_uid: projectUid })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatusNotification(data.message, 'success');
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                showStatusNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting project:', error);
+            showStatusNotification('Error deleting project', 'error');
+        });
+    }
+
+    function confirmDeleteTask(taskName) {
+        if (!currentProjectUid) return;
+        if (!confirm(`Delete the task "${taskName}"? This cannot be undone.`)) {
+            return;
+        }
+        deleteTask(taskName);
+    }
+
+    function deleteTask(taskName) {
+        fetch('/projects/delete_task', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ project_uid: currentProjectUid, task_name: taskName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatusNotification(data.message, 'success');
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                showStatusNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting task:', error);
+            showStatusNotification('Error deleting task', 'error');
+        });
+    }
+
+    function showProjectStatusPopup() {
+        if (!currentProject) return;
+
+        const currentStatus = currentProject.status || 'planning';
+        const validTransitions = getValidStatusTransitions(currentStatus, true);
+        if (!validTransitions.length) {
+            alert('No available status transitions for the current project status.');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Change Project Status</h2>
+                    <button class="modal-close" type="button">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Current status: <strong>${currentStatus.replace('-', ' ')}</strong></p>
+                    <div class="status-options">
+                        ${validTransitions.map(status => `<button type="button" class="status-option-btn" data-status="${status}">${status.replace('-', ' ')}</button>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+        modal.querySelectorAll('.status-option-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                updateProjectStatus(currentProjectUid, button.dataset.status);
+                modal.remove();
+            });
+        });
+    }
+
     function renderProjectFiles(project) {
         const projectFiles = project.project_files || [];
         const listElement = document.getElementById('project-files-list');
@@ -442,10 +790,18 @@
         const card = document.createElement('div');
         card.className = 'task-card';
         card.dataset.taskName = task.name;
+        
+        // Determine status class
+        const statusClass = `status-${task.status.replace(' ', '-')}`;
+        
         card.innerHTML = `
             <div class="task-card-header">
                 <p>${task.name}</p>
-                <button type="button" class="task-status-btn">${task.status.replace('-', ' ')}</button>
+                <div class="task-card-actions">
+                    <button type="button" class="task-edit-btn">✎ Edit</button>
+                    <button type="button" class="task-status-btn ${statusClass}">${task.status.replace('-', ' ').toUpperCase()}</button>
+                    <button type="button" class="task-delete-btn">🗑 Delete</button>
+                </div>
             </div>
             <div class="task-card-meta">
                 <span>${formatDate(task.due_date)}</span>
@@ -461,11 +817,27 @@
         card.addEventListener('click', () => showTaskDetails(task, project));
         card.addEventListener('dragstart', handleDragStart);
 
+        const editButton = card.querySelector('.task-edit-btn');
+        if (editButton) {
+            editButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                showEditTaskModal(task);
+            });
+        }
+
         const statusButton = card.querySelector('.task-status-btn');
         statusButton.addEventListener('click', function(e) {
             e.stopPropagation();
             showTaskStatusMenu(card, task);
         });
+
+        const deleteButton = card.querySelector('.task-delete-btn');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                confirmDeleteTask(task.name);
+            });
+        }
 
         return card;
     }
@@ -477,7 +849,13 @@
         const backlogTasks = tasks.filter(task => task.status === 'todo').length;
         const progressPercent = tasks.length ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
-        document.getElementById('project-status-label').textContent = project.status || 'Unknown';
+        const statusLabel = document.getElementById('project-status-label');
+        statusLabel.textContent = project.status || 'Unknown';
+        statusLabel.className = `status-${project.status.toLowerCase().replace(' ', '-')}`;
+        statusLabel.style.padding = '0.35rem 0.75rem';
+        statusLabel.style.borderRadius = '999px';
+        statusLabel.style.display = 'inline-block';
+        
         document.getElementById('project-category-label').textContent = project.category || 'Unspecified';
         document.getElementById('project-priority-label').textContent = project.priority || 'Medium';
         document.getElementById('project-timeline').textContent = `${formatDate(project.start_date)} — ${formatDate(project.end_date)}`;
@@ -491,7 +869,7 @@
     }
 
     function renderProjectTasks(project) {
-        ['todo', 'in-progress', 'review', 'done'].forEach(status => {
+        ['todo', 'in-progress', 'review', 'blocked', 'done'].forEach(status => {
             const column = document.getElementById(`tasks-${status}`);
             if (column) column.innerHTML = '';
         });
@@ -501,7 +879,8 @@
             const columnId = {
                 todo: 'tasks-todo',
                 'in-progress': 'tasks-in-progress',
-                review: 'tasks-review',
+                'in-review': 'tasks-review',
+                blocked: 'tasks-blocked',
                 done: 'tasks-done'
             }[task.status] || 'tasks-todo';
             document.getElementById(columnId).appendChild(card);
@@ -550,7 +929,7 @@
             });
         });
 
-        document.getElementById('report-task-health').textContent = `${statusCounts.done || 0} done, ${statusCounts['in-progress'] || 0} in progress, ${statusCounts.review || 0} in review`;
+        document.getElementById('report-task-health').textContent = `${statusCounts.done || 0} done, ${statusCounts['in-progress'] || 0} in progress, ${statusCounts['in-review'] || 0} in review, ${statusCounts.blocked || 0} blocked`;
         document.getElementById('report-priority-breakdown').textContent = `High: ${priorityCounts.high || 0}, Medium: ${priorityCounts.medium || 0}, Low: ${priorityCounts.low || 0}`;
         document.getElementById('report-member-breakdown').textContent = Object.entries(memberCounts)
             .map(([name, count]) => `${name}: ${count}`)
@@ -566,6 +945,7 @@
         }
 
         currentProjectUid = projectUid;
+        currentProject = project;
         document.getElementById('task-view-project-name').textContent = project.project_name;
         document.getElementById('task-detail-card').style.display = 'none';
         renderProjectSummary(project);
@@ -593,6 +973,12 @@
 
     function filterProjects() {
         const query = document.getElementById('project-search-input').value.toLowerCase();
+        if (!query) {
+            document.querySelectorAll('.project-card').forEach(card => {
+                card.style.display = 'block';
+            });
+            return;
+        }
         document.querySelectorAll('.project-card').forEach(card => {
             const name = card.querySelector('h4').textContent.toLowerCase();
             card.style.display = name.includes(query) ? 'block' : 'none';
@@ -638,6 +1024,7 @@
 <!-- Task Management JavaScript -->
 <script>
     let currentProjectUid = null;
+    let currentProject = null;
 
     // Make task cards draggable and clickable
     function makeTasksInteractive() {
@@ -694,7 +1081,8 @@
         const statusMap = {
             'tasks-todo': 'todo',
             'tasks-in-progress': 'in-progress',
-            'tasks-review': 'review',
+            'tasks-review': 'in-review',
+            'tasks-blocked': 'blocked',
             'tasks-done': 'done'
         };
         return statusMap[columnId] || 'todo';
@@ -1019,6 +1407,49 @@
     .status-badge:hover {
         transform: scale(1.05);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .task-card-actions button,
+    .task-view-actions button,
+    .status-options button {
+        border: none;
+        background: #e2e8f0;
+        color: #0f172a;
+        border-radius: 6px;
+        padding: 0.45rem 0.75rem;
+        margin-left: 0.4rem;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        font-size: 0.9rem;
+    }
+
+    .task-card-actions button:hover,
+    .task-view-actions button:hover,
+    .status-options button:hover {
+        background: #cbd5e1;
+    }
+
+    .delete-project-btn,
+    .task-delete-btn {
+        background: #fecaca;
+        color: #991b1b;
+    }
+
+    .delete-project-btn:hover,
+    .task-delete-btn:hover {
+        background: #fca5a5;
+    }
+
+    .status-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .status-option-btn {
+        background: #dbeafe;
+        color: #0c4a6e;
     }
 
     /* Project Status Colors */
