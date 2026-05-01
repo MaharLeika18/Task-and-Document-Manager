@@ -84,7 +84,7 @@ def profile():
         picture_url = request.form.get('picture_url', '').strip()
         photo_action = request.form.get('photo_action', 'save')
         photo_source = 'custom'
-
+ 
         # Handle file upload
         if 'profile_photo' in request.files and request.files['profile_photo'].filename:
             file_storage = request.files.get('profile_photo')

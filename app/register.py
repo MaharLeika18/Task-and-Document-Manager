@@ -28,7 +28,10 @@ def register():
             user_data.get("display_name") or 
             "User"
         )
-        session['picture'] = decoded.get("picture")
+        session["picture"] = (
+            decoded.get("picture") or 
+            "/static/default-avatar.png"
+        )        
         session["current_session_id"] = generate_secure_string(20)
         
         # Save user data to Firestore
@@ -40,7 +43,7 @@ def register():
                 'display_name': user_data.get('display_name', ''),
                 'email': decoded.get("email"),
                 'date_created': user_data.get('date_created', ''),
-                'picture': decoded.get("picture", ''),
+                'picture': decoded.get("picture") or "/static/default-avatar.png",
                 'google_picture': decoded.get("picture", ""),
                 'photo_source': 'google' if decoded.get("firebase", {}).get("sign_in_provider") == "google.com" else 'email'
             })
