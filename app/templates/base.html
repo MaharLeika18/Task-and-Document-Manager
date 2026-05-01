@@ -50,17 +50,6 @@
             <li><a href="{{ url_for('members.members') }}" id="members" class="{% if request.endpoint == 'members.members' %}active{% endif %}">Members</a></li>
             <li><a href="{{ url_for('calendar.calendar') }}" id="calendar" class="{% if request.endpoint == 'calendar.calendar' %}active{% endif %}">Calendar</a></li>
             <li><a href="{{ url_for('files.files') }}" id="files" class="{% if request.endpoint == 'files.files' %}active{% endif %}">Files</a></li>
-        <div class="dailies">
-            <div class="add-dailies">
-                <button id="add-daily-btn" title="Add Daily">
-                    <span class="material-symbols-outlined">add</span>
-                </button>
-            </div>
-            <h1>Dailies</h1>
-            <div class="dailies-list">
-                <!-- Daily items will be populated here -->
-            </div>
-        </div>
 
         <div class="logout">
             <button id="logout_btn">

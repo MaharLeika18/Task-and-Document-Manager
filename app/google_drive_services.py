@@ -1,6 +1,6 @@
 import io
 import os
-
+import re
 import dotenv
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
@@ -53,6 +53,12 @@ def gdrive_service():
 def _serialize_drive_item(item):
     mime_type = item.get('mimeType', '')
     file_name = item.get('name', '')
+    
+    # Clean displayed filename 
+    if '(' in file_name:
+        file_name = file_name.rsplit('(', 1)[0].strip()
+
+    file_name = re.sub(r'\s*\([^\w\s]{2,}.*\)$', '', file_name)
     parents = item.get('parents', []) or []
     
     return {
@@ -129,7 +135,8 @@ def create_project_folder(project_name, project_uid):
             }
         
         # Create folder with project name and UID for uniqueness
-        folder_name = f"{project_name} ({project_uid[:8]})"
+        safe_uid = re.sub(r'[^a-zA-Z0-9]', '', project_uid)[:8]
+        folder_name = f"{project_name} ({safe_uid})"
         metadata = {
             'name': folder_name,
             'mimeType': 'application/vnd.google-apps.folder',
