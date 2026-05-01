@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, redirect, render_template, request, send_file, session, url_for
+from urllib.parse import urlencode
 from datetime import datetime
 import io
 from googleapiclient.http import MediaIoBaseDownload
@@ -190,6 +191,18 @@ def view_file_route(file_id):
 
     file_data = result['file']
     mime_type = file_data.get('mime_type', '')
+    return_project_uid = request.args.get('project_uid') or request.args.get('return_project_uid')
+    return_folder_id = request.args.get('folder_id') or request.args.get('return_folder_id')
+
+    return_params = {}
+    if return_project_uid:
+        return_params['project_uid'] = return_project_uid
+    if return_folder_id:
+        return_params['folder_id'] = return_folder_id
+
+    return_url = url_for('files.files')
+    if return_params:
+        return_url = f"{return_url}?{urlencode(return_params)}"
     
     # For images, show in lightbox viewer
     if mime_type.startswith('image/'):
@@ -197,7 +210,8 @@ def view_file_route(file_id):
                              file_id=file_id, 
                              file_name=file_data.get('name', 'Image'),
                              image_src=url_for('files.inline_file_route', file_id=file_id),
-                             file_data=file_data)
+                             file_data=file_data,
+                             return_url=return_url)
     # For Google Docs/Sheets/Slides, use webViewLink
     elif 'google-apps' in mime_type:
         return render_template(
@@ -205,6 +219,7 @@ def view_file_route(file_id):
             preview_url=url_for('files.inline_file_route', file_id=file_id, export='pdf'),
             file_name=file_data.get('name', 'Document'),
             file_id=file_id,
+            return_url=return_url,
         )
     # For PDF, try webContentLink first, then webViewLink
     elif mime_type in ['application/pdf']:
@@ -213,6 +228,7 @@ def view_file_route(file_id):
             preview_url=url_for('files.inline_file_route', file_id=file_id),
             file_name=file_data.get('name', 'Document'),
             file_id=file_id,
+            return_url=return_url,
         )
     # For Office documents, embed them in an iframe via Google Viewer
     elif any(fmt in mime_type for fmt in ['word', 'spreadsheet', 'presentation']) or \
@@ -222,6 +238,7 @@ def view_file_route(file_id):
             preview_url=url_for('files.inline_file_route', file_id=file_id),
             file_name=file_data.get('name', 'Document'),
             file_id=file_id,
+            return_url=return_url,
         )
     # For other file types, try webViewLink (Google Drive preview)
     else:
@@ -230,6 +247,7 @@ def view_file_route(file_id):
             preview_url=url_for('files.inline_file_route', file_id=file_id),
             file_name=file_data.get('name', 'Document'),
             file_id=file_id,
+            return_url=return_url,
         )
 
 

@@ -31,7 +31,15 @@ VALID_TASK_TRANSITIONS = {
     'blocked': ['todo', 'in-progress']
 }
 
+def normalize_task_status(status):
+    if status == 'review':
+        return 'in-review'
+    return status
+
 CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.events.owned"]
+
+_calendar_validated = False
+_calendar_available = False
 
 def gcalendar_service():
     global calendar_id 
@@ -40,6 +48,32 @@ def gcalendar_service():
         os.getenv('COUNCILOG_SERVICE_ACCOUNT_FILE'), scopes=CALENDAR_SCOPES)
     service = build('calendar', 'v3', credentials=creds)
     return service
+
+def get_verified_calendar_id(service):
+    global _calendar_validated
+    global _calendar_available
+    global calendar_id
+
+    if _calendar_validated:
+        return calendar_id if _calendar_available else None
+
+    _calendar_validated = True
+    if not calendar_id:
+        _calendar_available = False
+        return None
+
+    try:
+        service.calendars().get(calendarId=calendar_id).execute()
+        _calendar_available = True
+        return calendar_id
+    except HttpError as error:
+        print(f'Warning: Google Calendar ID not accessible: {error}')
+        _calendar_available = False
+        return None
+    except Exception as error:
+        print(f'Warning: Could not validate Google Calendar ID: {error}')
+        _calendar_available = False
+        return None
 
 def create_project_firestore(project_maker, project_name, project_description, assigned_members, 
                     tasks, status, priority, category, calendar_link, start_date, end_date):
@@ -98,6 +132,9 @@ def create_project_gcalendar(project_name, project_description, start_date, end_
     """
     try:
         service = gcalendar_service()
+        verified_calendar_id = get_verified_calendar_id(service)
+        if not verified_calendar_id:
+            return None
 
         # Validate dates
         start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
@@ -120,7 +157,7 @@ def create_project_gcalendar(project_name, project_description, start_date, end_
             },
         }
 
-        created_event = service.events().insert(calendarId=calendar_id, body=event).execute()
+        created_event = service.events().insert(calendarId=verified_calendar_id, body=event).execute()
         print(f'Event created successfully: {created_event.get("htmlLink")}')
         return created_event.get('htmlLink')
 
@@ -142,6 +179,9 @@ def create_task_gcalendar(task_name, project_name, due_date, description=""):
     """
     try:
         service = gcalendar_service()
+        verified_calendar_id = get_verified_calendar_id(service)
+        if not verified_calendar_id:
+            return None
         due_datetime = datetime.strptime(due_date, '%Y-%m-%d')
         end_datetime = due_datetime + timedelta(days=1)
         event = {
@@ -156,7 +196,7 @@ def create_task_gcalendar(task_name, project_name, due_date, description=""):
                 'timeZone': 'UTC',
             },
         }
-        created_event = service.events().insert(calendarId=calendar_id, body=event).execute()
+        created_event = service.events().insert(calendarId=verified_calendar_id, body=event).execute()
         return {
             'htmlLink': created_event.get('htmlLink'),
             'id': created_event.get('id')
@@ -177,16 +217,61 @@ def update_task_event_status(event_id, task_name, project_name, new_status):
         if not event_id:
             return False
         service = gcalendar_service()
+        verified_calendar_id = get_verified_calendar_id(service)
+        if not verified_calendar_id:
+            return False
         base_summary = f"{task_name} — {project_name}"
         new_summary = f"✅ {base_summary}" if new_status == 'done' else base_summary
         service.events().patch(
-            calendarId=calendar_id,
+            calendarId=verified_calendar_id,
             eventId=event_id,
             body={'summary': new_summary}
         ).execute()
         return True
     except HttpError as error:
         print(f'Google Calendar API error updating event: {error}')
+        return False
+    except Exception as error:
+        print(f'Unexpected error updating task calendar event: {error}')
+        return False
+
+
+def update_task_event_details(event_id, task_name, project_name, due_date):
+    try:
+        if not event_id:
+            return False
+        if not due_date:
+            return False
+
+        service = gcalendar_service()
+        verified_calendar_id = get_verified_calendar_id(service)
+        if not verified_calendar_id:
+            return False
+        due_datetime = datetime.strptime(due_date, '%Y-%m-%d')
+        end_datetime = due_datetime + timedelta(days=1)
+        summary = f"{task_name} — {project_name}" if project_name else task_name
+
+        service.events().patch(
+            calendarId=verified_calendar_id,
+            eventId=event_id,
+            body={
+                'summary': summary,
+                'start': {
+                    'date': due_date,
+                    'timeZone': 'UTC',
+                },
+                'end': {
+                    'date': end_datetime.strftime('%Y-%m-%d'),
+                    'timeZone': 'UTC',
+                }
+            }
+        ).execute()
+        return True
+    except HttpError as error:
+        print(f'Google Calendar API error updating task details: {error}')
+        return False
+    except ValueError as error:
+        print(f'Date parsing error updating task details: {error}')
         return False
     except Exception as error:
         print(f'Unexpected error updating task calendar event: {error}')
@@ -279,7 +364,7 @@ def get_google_calendar_events(user_uid):
     """Fetch events from Google Calendar for the user's calendar"""
     try:
         service = gcalendar_service()
-        calendar_id = os.getenv('COUNCILOG_CALENDAR_ID')
+        calendar_id = get_verified_calendar_id(service)
         
         if not calendar_id:
             return []
@@ -366,6 +451,9 @@ def sync_task_to_google_calendar(task_event_id, task_name, project_name, status,
         ).execute()
         
         return True
+    except HttpError as error:
+        print(f'Error syncing task to Google Calendar: {error}')
+        return False
     except Exception as e:
         print(f'Error syncing task to Google Calendar: {e}')
         return False
@@ -576,6 +664,7 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
     Validates status transitions and logs audit trail.
     """
     try:
+        new_status = normalize_task_status(new_status)
         # Validate new status
         if new_status not in TASK_STATUSES:
             return {
@@ -598,7 +687,7 @@ def update_task_status(project_uid, task_name, new_status, user_uid):
                 # Find and validate task and user authorization
                 for idx, task in enumerate(tasks):
                     if task.get('name') == task_name and user_uid in task.get('members', []):
-                        old_status = task.get('status', 'todo')
+                        old_status = normalize_task_status(task.get('status', 'todo'))
                         
                         # Validate status transition
                         valid_transitions = VALID_TASK_TRANSITIONS.get(old_status, [])
@@ -838,9 +927,9 @@ def update_task_details(project_uid, task_name, task_updates, user_uid):
                     new_priority = task_updates.get('priority')
                     new_due_date = task_updates.get('due_date')
                     new_members = task_updates.get('members')
-                    new_status = task_updates.get('status')
+                    new_status = normalize_task_status(task_updates.get('status'))
 
-                    old_status = task.get('status', 'todo')
+                    old_status = normalize_task_status(task.get('status', 'todo'))
                     if new_status and new_status != old_status:
                         valid_transitions = VALID_TASK_TRANSITIONS.get(old_status, [])
                         if new_status not in valid_transitions:
@@ -873,6 +962,14 @@ def update_task_details(project_uid, task_name, task_updates, user_uid):
                         task['members'] = new_members
                         if user_uid not in task['members']:
                             task['members'].append(user_uid)
+
+                    if task.get('event_id') and (new_name or new_due_date):
+                        update_task_event_details(
+                            task.get('event_id'),
+                            new_name or task.get('name'),
+                            project_data.get('project_name', ''),
+                            new_due_date or task.get('due_date')
+                        )
 
                     task['last_updated'] = datetime.now().isoformat()
                     task['last_updated_by'] = user_uid

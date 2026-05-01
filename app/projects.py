@@ -38,14 +38,48 @@ def create_project():
             "picture": session["picture"],
             "current_session_id": session["current_session_id"]
         }
-        project_name = request.form['project-name']
-        project_description = request.form['project-description']
+        project_name = (request.form.get('project-name') or '').strip()
+        project_description = (request.form.get('project-description') or '').strip()
         assign_members = request.form.getlist('members')
-        project_status = request.form['project-status']
-        project_priority = request.form['project-priority']
-        project_category = request.form['project-category']
-        deadline = request.form['deadline']
-        deadline_obj = datetime.strptime(deadline, '%Y-%m-%d')
+        project_status = request.form.get('project-status')
+        project_priority = request.form.get('project-priority')
+        project_category = request.form.get('project-category')
+        project_category_custom = (request.form.get('project-category-custom') or '').strip()
+        deadline = request.form.get('deadline')
+
+        if not project_name or not deadline:
+            projects = get_projects_for_user(user['uid'])
+            for project in projects:
+                project['tasks'] = get_tasks_for_project_user(project['project_uid'], user['uid'])
+            return render_template(
+                "projects.html",
+                user=user,
+                members=get_users(),
+                projects=projects,
+                error="Project name and deadline are required."
+            )
+
+        if project_category == 'other':
+            project_category = project_category_custom or 'Other'
+
+        if '__none__' in assign_members:
+            assign_members = []
+        else:
+            assign_members = [member for member in assign_members if member and member != '__none__']
+
+        try:
+            deadline_obj = datetime.strptime(deadline, '%Y-%m-%d')
+        except ValueError:
+            projects = get_projects_for_user(user['uid'])
+            for project in projects:
+                project['tasks'] = get_tasks_for_project_user(project['project_uid'], user['uid'])
+            return render_template(
+                "projects.html",
+                user=user,
+                members=get_users(),
+                projects=projects,
+                error="Invalid deadline format. Please select a valid date."
+            )
 
         start_date = datetime.now().strftime('%Y-%m-%d')
         end_date = deadline_obj.strftime('%Y-%m-%d')
@@ -109,12 +143,11 @@ def update_task_status_route():
         _, project_data = get_project_by_uid(project_uid)
         if project_data:
             project_name = project_data.get('project_name', 'Project')
-            # Construct task event ID (typically project_uid_taskname)
-            task_event_id = f"{project_uid}_{task_name}".replace(' ', '_')
-            # Get due date from task object returned in result
             task_obj = result.get('task', {})
             due_date = task_obj.get('due_date', '')
-            sync_task_to_google_calendar(task_event_id, task_name, project_name, new_status, due_date)
+            event_id = task_obj.get('event_id')
+            if event_id:
+                sync_task_to_google_calendar(event_id, task_name, project_name, new_status, due_date)
     
     return jsonify(result)
 
@@ -252,7 +285,7 @@ def delete_task_route():
     result = delete_task(project_uid, task_name, user_uid)
     return jsonify(result)
 
-@projects_bp.route('/get_project_tasks/<project_uid>', methods=['GET'])
+@projects_bp.route('/get_project_tasks/<path:project_uid>', methods=['GET'])
 @auth_required
 def get_project_tasks(project_uid):
     """Get all tasks for a specific project"""

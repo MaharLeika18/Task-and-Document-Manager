@@ -58,6 +58,23 @@
     </div>
 </div>
 
+<div id="file-preview-modal" class="modal">
+    <div class="modal-content file-preview-content">
+        <div class="modal-header">
+            <h3 id="file-preview-title"></h3>
+            <div class="modal-actions">
+                <a id="file-preview-download" class="doc-btn" href="#" title="Download">⬇️</a>
+                <button type="button" id="file-preview-close" class="doc-btn" title="Close">✕</button>
+            </div>
+        </div>
+        <div class="modal-body file-preview-body">
+            <iframe id="file-preview-iframe" title="File preview" class="file-preview-iframe" style="display: none;"></iframe>
+            <img id="file-preview-image" alt="" class="file-preview-image" style="display: none;" />
+            <div id="file-preview-fallback" class="empty-state" style="display: none;">Preview not available. Use download instead.</div>
+        </div>
+    </div>
+</div>
+
 <style>
     .files-page {
         display: flex;
@@ -364,6 +381,42 @@
         color: #999;
         padding: 2rem 1rem;
     }
+
+    #file-preview-modal {
+        display: none;
+    }
+
+    .file-preview-content {
+        width: 92%;
+        max-width: 1000px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .file-preview-body {
+        flex: 1;
+        min-height: 60vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .file-preview-iframe {
+        width: 100%;
+        height: 70vh;
+        border: none;
+        border-radius: 8px;
+        background: white;
+    }
+
+    .file-preview-image {
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
     
     @media (max-width: 1024px) {
         .files-content-area {
@@ -408,10 +461,29 @@
     const uploadForm = document.getElementById('upload-form');
     const fileInput = document.getElementById('file-input');
 
+    const previewModal = document.getElementById('file-preview-modal');
+    const previewTitle = document.getElementById('file-preview-title');
+    const previewIframe = document.getElementById('file-preview-iframe');
+    const previewImage = document.getElementById('file-preview-image');
+    const previewFallback = document.getElementById('file-preview-fallback');
+    const previewDownload = document.getElementById('file-preview-download');
+    const previewClose = document.getElementById('file-preview-close');
+
     let allFiles = [];
     let currentFolderId = '';
     let folderStack = [];
     let currentFolder = null;
+    const fileMetadataIndex = new Map();
+
+    function cacheFileMetadata(file) {
+        if (file && file.file_id) {
+            fileMetadataIndex.set(file.file_id, file);
+        }
+    }
+
+    function getCachedFile(fileId) {
+        return fileMetadataIndex.get(fileId);
+    }
 
     function formatBytes(bytes) {
         const num = Number(bytes || 0);
@@ -422,52 +494,98 @@
         return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
     }
 
+    function iconMarkup(iconName) {
+        return `<span class="material-symbols-outlined">${iconName}</span>`;
+    }
+
     function iconForFile(file) {
-        if (file.is_folder) return 'FOLDER';
+        if (file.is_folder) return iconMarkup('folder');
         const name = (file.name || '').toLowerCase();
         const mime = (file.mime_type || '').toLowerCase();
         
         // Images
-        if (mime.includes('image/')) return 'IMAGE';
+        if (mime.includes('image/')) return iconMarkup('image');
         
         // PDF
-        if (mime.includes('pdf')) return 'PDF';
+        if (mime.includes('pdf')) return iconMarkup('picture_as_pdf');
         
         // Office Documents
         if (mime.includes('spreadsheet') || name.endsWith('.xlsx') || name.endsWith('.xls') || 
-            mime.includes('sheet') || mime.includes('ms-excel')) return 'SHEET';
+            mime.includes('sheet') || mime.includes('ms-excel')) return iconMarkup('table_chart');
         
         if (mime.includes('wordprocessingml') || mime.includes('word') || mime.includes('document') ||
-            name.endsWith('.docx') || name.endsWith('.doc')) return 'DOC';
+            name.endsWith('.docx') || name.endsWith('.doc')) return iconMarkup('description');
         
         if (mime.includes('presentation') || mime.includes('powerpoint') || 
-            name.endsWith('.pptx') || name.endsWith('.ppt')) return 'SLIDE';
+            name.endsWith('.pptx') || name.endsWith('.ppt')) return iconMarkup('slideshow');
         
         // Text files
-        if (mime.includes('text') || name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json')) return 'TEXT';
+        if (mime.includes('text') || name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json')) return iconMarkup('article');
         
         // Archive
         if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z') || 
-            mime.includes('archive') || mime.includes('zip')) return 'ZIP';
+            mime.includes('archive') || mime.includes('zip')) return iconMarkup('archive');
         
         // Code
         if (mime.includes('text/plain') || name.endsWith('.js') || name.endsWith('.py') || 
-            name.endsWith('.java') || name.endsWith('.cpp') || name.endsWith('.html')) return 'CODE';
+            name.endsWith('.java') || name.endsWith('.cpp') || name.endsWith('.html')) return iconMarkup('code');
         
         // Google Docs
         if (mime.includes('google-apps')) {
-            if (mime.includes('document')) return 'DOC';
-            if (mime.includes('spreadsheet')) return 'SHEET';
-            if (mime.includes('presentation')) return 'SLIDE';
-            return 'GDOCS';
+            if (mime.includes('document')) return iconMarkup('description');
+            if (mime.includes('spreadsheet')) return iconMarkup('table_chart');
+            if (mime.includes('presentation')) return iconMarkup('slideshow');
+            return iconMarkup('insert_drive_file');
         }
         
-        return 'FILE';
+        return iconMarkup('insert_drive_file');
+    }
+
+    function getPreviewUrl(file) {
+        const mime = (file.mime_type || '').toLowerCase();
+        if (mime.includes('google-apps')) {
+            return `/files/inline/${file.file_id}?export=pdf`;
+        }
+        return `/files/inline/${file.file_id}`;
+    }
+
+    function openPreviewModal(file) {
+        if (!file) return;
+        previewTitle.textContent = file.name || 'File preview';
+        previewDownload.href = `/files/download/${file.file_id}`;
+
+        const mime = (file.mime_type || '').toLowerCase();
+        const isImage = mime.startsWith('image/');
+        const previewUrl = getPreviewUrl(file);
+
+        previewIframe.style.display = isImage ? 'none' : 'block';
+        previewImage.style.display = isImage ? 'block' : 'none';
+        previewFallback.style.display = 'none';
+
+        if (isImage) {
+            previewImage.src = previewUrl;
+            previewImage.alt = file.name || 'Preview image';
+        } else {
+            previewIframe.src = previewUrl;
+        }
+
+        previewModal.style.display = 'block';
+    }
+
+    function closePreviewModal() {
+        previewModal.style.display = 'none';
+        previewIframe.src = '';
+        previewImage.src = '';
     }
 
     function getActiveFolderLabel() {
         if (currentFolder && currentFolder.name) {
             return currentFolder.name;
+        }
+
+        const lastStack = folderStack[folderStack.length - 1];
+        if (lastStack && lastStack.name) {
+            return lastStack.name;
         }
 
         const projectUid = getSelectedProjectUid();
@@ -517,6 +635,26 @@
         folderBreadcrumb.querySelector('[data-folder-up]')?.addEventListener('click', goUpOneLevel);
     }
 
+    function syncFilesUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const projectUid = getSelectedProjectUid();
+        if (projectUid) {
+            params.set('project_uid', projectUid);
+        } else {
+            params.delete('project_uid');
+        }
+
+        if (currentFolderId) {
+            params.set('folder_id', currentFolderId);
+        } else {
+            params.delete('folder_id');
+        }
+
+        const query = params.toString();
+        const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+        window.history.replaceState({}, '', nextUrl);
+    }
+
     function getSelectedProjectUid() {
         return projectFilter.value || '';
     }
@@ -564,7 +702,7 @@
                 <p>${sizeText} • ${modifiedText}</p>
             </div>
             <div class="file-actions-inline">
-                ${file.is_folder ? `<button type="button" class="action-link" data-open-folder="${file.file_id}">Open</button>` : `<a href="/files/view/${file.file_id}" target="_blank" class="action-link">View</a>`}
+                ${file.is_folder ? `<button type="button" class="action-link" data-open-folder="${file.file_id}">Open</button>` : `<button type="button" class="action-link" data-view-file-id="${file.file_id}">View</button>`}
                 ${!file.is_folder ? `<a href="/files/download/${file.file_id}" class="action-link">Download</a>` : ''}
                 ${!file.is_folder ? `<button type="button" class="action-link" data-link-file-id="${file.file_id}">Link</button>` : ''}
                 <button type="button" class="action-link action-danger" data-delete-file-id="${file.file_id}">Delete</button>
@@ -599,6 +737,14 @@
             });
         }
 
+        const viewButton = card.querySelector('button[data-view-file-id]');
+        if (viewButton) {
+            viewButton.addEventListener('click', event => {
+                event.stopPropagation();
+                openPreviewModal(file);
+            });
+        }
+
         return card;
     }
 
@@ -627,13 +773,11 @@
         const blocks = [];
         if (projectFiles.length) {
             const filesList = projectFiles.map(file => {
-                const iconType = file.mime_type && file.mime_type.includes('pdf') ? 'PDF' : 
-                                 file.mime_type && file.mime_type.includes('image') ? 'IMAGE' :
-                                 file.mime_type && file.mime_type.includes('word') ? 'DOC' :
-                                 file.mime_type && file.mime_type.includes('spreadsheet') ? 'SHEET' : 'FILE';
+                cacheFileMetadata(file);
+                const iconType = iconForFile(file);
                 return `<li>
                     <span class="file-icon">${iconType}</span>
-                    <a href="/files/view/${file.file_id}" target="_blank" title="${file.name}">${file.name}</a>
+                    <a href="#" data-view-file-id="${file.file_id}" title="${file.name}">${file.name}</a>
                     <span class="file-size">${formatBytes(file.size)}</span>
                 </li>`;
             }).join('');
@@ -648,13 +792,11 @@
         taskFiles.forEach(task => {
             if (task.files && task.files.length) {
                 const filesList = task.files.map(file => {
-                    const iconType = file.mime_type && file.mime_type.includes('pdf') ? 'PDF' : 
-                                     file.mime_type && file.mime_type.includes('image') ? 'IMAGE' :
-                                     file.mime_type && file.mime_type.includes('word') ? 'DOC' :
-                                     file.mime_type && file.mime_type.includes('spreadsheet') ? 'SHEET' : 'FILE';
+                    cacheFileMetadata(file);
+                    const iconType = iconForFile(file);
                     return `<li>
                         <span class="file-icon">${iconType}</span>
-                        <a href="/files/view/${file.file_id}" target="_blank" title="${file.name}">${file.name}</a>
+                        <a href="#" data-view-file-id="${file.file_id}" title="${file.name}">${file.name}</a>
                         <span class="file-size">${formatBytes(file.size)}</span>
                     </li>`;
                 }).join('');
@@ -695,11 +837,14 @@
             }
 
             allFiles = data.items || [];
+            fileMetadataIndex.clear();
+            allFiles.forEach(cacheFileMetadata);
             currentFolder = data.current_folder || null;
             if (!folderStack.length && currentFolder) {
                 folderStack = [currentFolder];
                 currentFolderId = currentFolder.file_id || currentFolderId;
             }
+            syncFilesUrl();
             statusEl.textContent = `${allFiles.length} item(s) loaded from Google Drive.`;
             renderBreadcrumb();
             applySearch();
@@ -906,6 +1051,34 @@
         }
     });
 
+    if (previewClose) {
+        previewClose.addEventListener('click', closePreviewModal);
+    }
+
+    previewModal.addEventListener('click', event => {
+        if (event.target === previewModal) {
+            closePreviewModal();
+        }
+    });
+
+    referencesList.addEventListener('click', event => {
+        const link = event.target.closest('[data-view-file-id]');
+        if (!link) return;
+        event.preventDefault();
+        const fileId = link.getAttribute('data-view-file-id');
+        const file = getCachedFile(fileId);
+        if (file) {
+            openPreviewModal(file);
+        } else {
+            const params = new URLSearchParams();
+            const projectUid = getSelectedProjectUid();
+            if (projectUid) params.set('project_uid', projectUid);
+            if (currentFolderId) params.set('folder_id', currentFolderId);
+            const suffix = params.toString() ? `?${params.toString()}` : '';
+            window.location.href = `/files/view/${fileId}${suffix}`;
+        }
+    });
+
     document.getElementById('refresh-files').addEventListener('click', loadFiles);
     document.getElementById('create-folder').addEventListener('click', createFolder);
     uploadForm.addEventListener('submit', uploadFiles);
@@ -920,6 +1093,18 @@
     });
 
     taskFilter.addEventListener('change', loadReferencesOnly);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialProjectUid = urlParams.get('project_uid');
+    const initialFolderId = urlParams.get('folder_id');
+
+    if (initialProjectUid) {
+        projectFilter.value = initialProjectUid;
+    }
+
+    if (initialFolderId) {
+        currentFolderId = initialFolderId;
+    }
 
     buildTaskOptions(projectFilter.value);
     loadFiles();

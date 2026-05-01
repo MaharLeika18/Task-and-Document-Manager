@@ -14,14 +14,14 @@
     {# this is the else if may project na selected si user#}
         <div class="date">
             <h3>TODAY'S DATE</h3>
-            <h1>{# today_date #}</h1>
+            <h1 id="projects-today-date">--</h1>
         </div>
 
         {# will populate these later#}
         <div class="project-stats">
             <h3>PROJECT STATS</h3>
-            <p>Number of Tasks: </p>
-            <p>Number of Members:</p>
+            <p>Number of Tasks: <span id="overview-task-count">--</span></p>
+            <p>Number of Members: <span id="overview-member-count">--</span></p>
         </div>
         <button id="create-project">Create a project</button>
     </div>
@@ -29,11 +29,11 @@
     lang tong form pag pinindot yung create_project button HAHAHAH#}
     {# floating div na lang siguro toh gois kayo na bahala HAAHAHAHAA#}
     <div class="create-project">    
-        <button type="button" id="close-create-project">✕ Cancel</button>
-        <form action="{{ url_for('projects.create_project') }}" method="POST">
+        <button type="button" id="close-create-project" class="close-create-project">✕</button>
+        <form action="{{ url_for('projects.create_project') }}" method="POST" id="create-project-form">
             <h2>Create a new project</h2>
 
-            <input type="text" placeholder="Project Name" name="project-name">
+            <input type="text" placeholder="Project Name" name="project-name" required>
             <textarea placeholder="Project Description" name="project-description"></textarea>
             {# <input type="text" placeholder="Assign Members" name="assign-members"> #}
 
@@ -42,7 +42,7 @@
             <div>
                 <!-- Include current user -->
                 <label>
-                    <input type="checkbox" name="members" value="{{ user.uid }}" checked>
+                    <input type="checkbox" class="project-member-checkbox" name="members" value="{{ user.uid }}" checked>
                     {{ user.name }} (You)
                 </label>
             </div>
@@ -51,22 +51,30 @@
                 {% for member in members %}
                     <div>
                         <label>
-                            <input type="checkbox" name="members" value="{{ member.uid }}">
+                            <input type="checkbox" class="project-member-checkbox" name="members" value="{{ member.uid }}">
                             {{ member.name }}
                         </label>
                     </div>
                 {% endfor %}
             {% endif %}
 
+            <div class="member-none-option" id="member-none-option">
+                <label>
+                    <input type="checkbox" name="members" value="__none__" id="member-none-checkbox">
+                    None
+                </label>
+            </div>
+
             <div class="tasks-section">
                 <div class="tasks-header">
                     <label>Tasks:</label>
-                    <button type="button" id="add-task-btn" onclick="addTask()">+ Add Task</button>
                 </div>
 
                 <div id="tasks-container">
                     <!-- Task rows are added here dynamically -->
                 </div>
+
+                <button type="button" id="add-task-btn">+ Add Task</button>
             </div>
 
             <label for="project-status">Project Status:</label>
@@ -91,12 +99,15 @@
                 <option value="seminar">Seminar</option>
                 <option value="competition">Competition</option>
                 <option value="general-assembly">General Assembly</option>
+                <option value="other">Other</option>
             </select>
 
-            <label for="deadline">Deadline:</label>
-            <input name="deadline" type="date">
+            <input type="text" name="project-category-custom" id="project-category-custom" placeholder="Enter custom category" style="display: none;">
 
-            <button type="submit">Create</button>
+            <label for="deadline">Deadline:</label>
+            <input name="deadline" type="date" required>
+
+            <button type="submit" id="create-project-submit">Create</button>
         </form>
         <h3>{{ error }}</h3>
     </div>
@@ -201,7 +212,7 @@
                 <div class="task-view-actions">
                     <button type="button" onclick="closeProject()">← BACK TO PROJECTS</button>
                     <button type="button" class="edit-project-btn" onclick="showEditProjectModal()">✎ Edit Project</button>
-                    <button type="button" class="edit-project-btn" onclick="showProjectStatusPopup()">⚙️ Change Status</button>
+                    <button type="button" class="edit-project-btn" id="change-project-status" onclick="showProjectStatusPopup()">⚙️ Change Status</button>
                     <button type="button" class="delete-project-btn" onclick="confirmDeleteProject()">🗑️ Delete Project</button>
                 </div>
                 <div>
@@ -399,10 +410,68 @@
 
 <!-- Project table + task view logic -->
 <script>
-    const today = new Date();
-    document.getElementById('task-view-date').textContent = today.toLocaleDateString('en-US', {
-        month: 'long', day: 'numeric', year: 'numeric'
+    const APP_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+        timeZone: APP_TIMEZONE,
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
     });
+
+    function parseDateValue(value) {
+        if (!value) return null;
+        if (value instanceof Date) return value;
+        const trimmed = String(value).trim();
+        if (!trimmed) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            return new Date(`${trimmed}T00:00:00`);
+        }
+        const parsed = new Date(trimmed);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function formatDate(value) {
+        const date = parseDateValue(value);
+        if (!date) return value ? String(value) : 'TBD';
+        return SHORT_DATE_FORMATTER.format(date);
+    }
+
+    function setTodayDate() {
+        const today = new Date();
+        const todayLabel = formatDate(today);
+        const headerDate = document.getElementById('projects-today-date');
+        if (headerDate) headerDate.textContent = todayLabel;
+        const taskViewDate = document.getElementById('task-view-date');
+        if (taskViewDate) taskViewDate.textContent = todayLabel;
+    }
+
+    function updateOverviewStats() {
+        const totalTasks = PROJECTS_DATA.reduce((acc, project) => acc + (project.tasks || []).length, 0);
+        const memberSet = new Set();
+        PROJECTS_DATA.forEach(project => {
+            (project.assigned_members || []).forEach(uid => memberSet.add(uid));
+        });
+        const taskCountEl = document.getElementById('overview-task-count');
+        const memberCountEl = document.getElementById('overview-member-count');
+        if (taskCountEl) taskCountEl.textContent = totalTasks || 0;
+        if (memberCountEl) memberCountEl.textContent = memberSet.size || 0;
+    }
+
+    function applyProjectCardDates() {
+        PROJECTS_DATA.forEach(project => {
+            const card = document.querySelector(`.project-card[data-project-uid="${project.project_uid}"]`);
+            if (!card) return;
+            const meta = card.querySelector('.project-card-meta');
+            const dateSpan = meta ? meta.querySelector('span:last-child') : null;
+            if (dateSpan) {
+                dateSpan.textContent = project.end_date ? formatDate(project.end_date) : 'No deadline';
+            }
+        });
+    }
+
+    setTodayDate();
+    updateOverviewStats();
+    applyProjectCardDates();
 
     function getMemberName(uid) {
         if (uid === CURRENT_USER.uid) {
@@ -412,25 +481,18 @@
         return member ? member.name : 'Unknown';
     }
 
-    function formatDate(dateString) {
-        if (!dateString) {
-            return 'TBD';
-        }
-        const date = new Date(dateString);
-        if (Number.isNaN(date.getTime())) {
-            return dateString;
-        }
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
+    
 
     function showTaskDetails(task, project) {
         document.getElementById('task-detail-card').style.display = 'block';
         document.getElementById('task-detail-title').textContent = task.name;
         document.getElementById('task-detail-project').textContent = project.project_name;
-        document.getElementById('task-detail-priority').textContent = task.priority;
-        document.getElementById('task-detail-status').textContent = task.status.replace('-', ' ');
+        const statusValue = task.status || 'todo';
+        document.getElementById('task-detail-priority').textContent = task.priority || 'medium';
+        document.getElementById('task-detail-status').textContent = statusValue.replace('-', ' ');
         document.getElementById('task-detail-due').textContent = formatDate(task.due_date);
-        document.getElementById('task-detail-members').textContent = task.members.map(getMemberName).join(', ');
+        const taskMembers = task.members || [];
+        document.getElementById('task-detail-members').textContent = taskMembers.map(getMemberName).join(', ');
 
         const linkElement = document.getElementById('task-detail-link');
         if (task.event_link) {
@@ -457,10 +519,11 @@
     function showEditProjectModal() {
         if (!currentProject) return;
         const modal = document.createElement('div');
-        modal.className = 'modal';
+        modal.className = 'modal show';
+        const assignedMembers = currentProject.assigned_members || [];
         const memberCheckboxes = ALL_MEMBERS.map(member => `
             <label class="modal-checkbox-label">
-                <input type="checkbox" name="assigned_members" value="${member.uid}" ${currentProject.assigned_members.includes(member.uid) ? 'checked' : ''}>
+                <input type="checkbox" name="assigned_members" value="${member.uid}" ${assignedMembers.includes(member.uid) ? 'checked' : ''}>
                 ${member.name}
             </label>
         `).join('');
@@ -501,7 +564,10 @@
                             <option value="seminar">Seminar</option>
                             <option value="competition">Competition</option>
                             <option value="general-assembly">General Assembly</option>
+                            <option value="other">Other</option>
                         </select>
+
+                        <input type="text" id="edit-project-category-custom" placeholder="Enter custom category" style="display: none;">
 
                         <label>Start Date</label>
                         <input type="date" id="edit-project-start" value="${currentProject.start_date || ''}">
@@ -519,6 +585,11 @@
         `;
 
         document.body.appendChild(modal);
+        modal.addEventListener('click', event => {
+            if (event.target === modal) {
+                modal.remove();
+            }
+        });
         modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
 
         const statusSelect = modal.querySelector('#edit-project-status');
@@ -530,20 +601,43 @@
             prioritySelect.value = currentProject.priority || 'medium';
         }
         const categorySelect = modal.querySelector('#edit-project-category');
+        const categoryCustomInput = modal.querySelector('#edit-project-category-custom');
         if (categorySelect) {
-            categorySelect.value = currentProject.category || 'ces';
+            const baseCategories = ['ces', 'seminar', 'competition', 'general-assembly'];
+            if (currentProject.category && baseCategories.includes(currentProject.category)) {
+                categorySelect.value = currentProject.category;
+                categoryCustomInput.style.display = 'none';
+                categoryCustomInput.value = '';
+            } else {
+                categorySelect.value = 'other';
+                categoryCustomInput.style.display = 'block';
+                categoryCustomInput.value = currentProject.category || '';
+            }
+
+            categorySelect.addEventListener('change', () => {
+                if (categorySelect.value === 'other') {
+                    categoryCustomInput.style.display = 'block';
+                } else {
+                    categoryCustomInput.style.display = 'none';
+                    categoryCustomInput.value = '';
+                }
+            });
         }
 
         modal.querySelector('#edit-project-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const assigned_members = Array.from(modal.querySelectorAll('input[name="assigned_members"]:checked')).map(input => input.value);
+            const selectedCategory = categorySelect.value === 'other'
+                ? (categoryCustomInput.value || '').trim()
+                : categorySelect.value;
+
             updateProjectDetails({
                 project_uid: currentProjectUid,
                 project_name: modal.querySelector('#edit-project-name').value,
                 project_description: modal.querySelector('#edit-project-description').value,
                 status: modal.querySelector('#edit-project-status').value,
                 priority: modal.querySelector('#edit-project-priority').value,
-                category: modal.querySelector('#edit-project-category').value,
+                category: selectedCategory || 'Other',
                 start_date: modal.querySelector('#edit-project-start').value,
                 end_date: modal.querySelector('#edit-project-end').value,
                 assigned_members
@@ -555,10 +649,11 @@
     function showEditTaskModal(task) {
         if (!currentProjectUid || !task) return;
         const modal = document.createElement('div');
-        modal.className = 'modal';
+        modal.className = 'modal show';
+        const assignedMembers = task.members || [];
         const taskMembers = ALL_MEMBERS.map(member => `
             <label class="modal-checkbox-label">
-                <input type="checkbox" name="task_members" value="${member.uid}" ${task.members.includes(member.uid) ? 'checked' : ''}>
+                <input type="checkbox" name="task_members" value="${member.uid}" ${assignedMembers.includes(member.uid) ? 'checked' : ''}>
                 ${member.name}
             </label>
         `).join('');
@@ -603,6 +698,11 @@
         `;
 
         document.body.appendChild(modal);
+        modal.addEventListener('click', event => {
+            if (event.target === modal) {
+                modal.remove();
+            }
+        });
         modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
 
         modal.querySelector('#edit-task-priority').value = task.priority || 'medium';
@@ -636,7 +736,23 @@
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
-                setTimeout(() => location.reload(), 800);
+                const projectIndex = PROJECTS_DATA.findIndex(project => project.project_uid === payload.project_uid);
+                if (projectIndex >= 0) {
+                    Object.assign(PROJECTS_DATA[projectIndex], {
+                        project_name: payload.project_name,
+                        project_description: payload.project_description,
+                        status: payload.status,
+                        priority: payload.priority,
+                        category: payload.category,
+                        start_date: payload.start_date,
+                        end_date: payload.end_date,
+                        assigned_members: payload.assigned_members
+                    });
+                    currentProject = PROJECTS_DATA[projectIndex];
+                }
+                syncProjectCard(currentProject);
+                renderCurrentProjectView();
+                updateOverviewStats();
             } else {
                 showStatusNotification(data.message, 'error');
             }
@@ -659,7 +775,7 @@
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
-                setTimeout(() => location.reload(), 800);
+                refreshCurrentProjectTasks();
             } else {
                 showStatusNotification(data.message, 'error');
             }
@@ -690,7 +806,14 @@
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
-                setTimeout(() => window.location.reload(), 800);
+                const projectIndex = PROJECTS_DATA.findIndex(project => project.project_uid === projectUid);
+                if (projectIndex >= 0) {
+                    PROJECTS_DATA.splice(projectIndex, 1);
+                }
+                const card = document.querySelector(`.project-card[data-project-uid="${projectUid}"]`);
+                if (card) card.remove();
+                closeProject();
+                updateOverviewStats();
             } else {
                 showStatusNotification(data.message, 'error');
             }
@@ -721,7 +844,7 @@
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
-                setTimeout(() => window.location.reload(), 800);
+                refreshCurrentProjectTasks();
             } else {
                 showStatusNotification(data.message, 'error');
             }
@@ -790,27 +913,26 @@
         const card = document.createElement('div');
         card.className = 'task-card';
         card.dataset.taskName = task.name;
-        
-        // Determine status class
-        const statusClass = `status-${task.status.replace(' ', '-')}`;
+        const statusValue = task.status || 'todo';
+        const statusClass = `status-${statusValue.replace(' ', '-')}`;
         
         card.innerHTML = `
             <div class="task-card-header">
                 <p>${task.name}</p>
                 <div class="task-card-actions">
                     <button type="button" class="task-edit-btn">✎ Edit</button>
-                    <button type="button" class="task-status-btn ${statusClass}">${task.status.replace('-', ' ').toUpperCase()}</button>
+                    <button type="button" class="task-status-btn ${statusClass}">${statusValue.replace('-', ' ').toUpperCase()}</button>
                     <button type="button" class="task-delete-btn">🗑 Delete</button>
                 </div>
             </div>
             <div class="task-card-meta">
                 <span>${formatDate(task.due_date)}</span>
-                <span>${task.members.length} assigned</span>
+                <span>${(task.members || []).length} assigned</span>
             </div>
             <span class="task-priority priority-${task.priority}">${task.priority}</span>
         `;
 
-        if (task.status === 'done') {
+        if (statusValue === 'done') {
             card.classList.add('task-card-completed');
         }
 
@@ -850,8 +972,9 @@
         const progressPercent = tasks.length ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
         const statusLabel = document.getElementById('project-status-label');
+        const statusValue = (project.status || 'unknown').toLowerCase();
         statusLabel.textContent = project.status || 'Unknown';
-        statusLabel.className = `status-${project.status.toLowerCase().replace(' ', '-')}`;
+        statusLabel.className = `status-${statusValue.replace(' ', '-')}`;
         statusLabel.style.padding = '0.35rem 0.75rem';
         statusLabel.style.borderRadius = '999px';
         statusLabel.style.display = 'inline-block';
@@ -859,7 +982,8 @@
         document.getElementById('project-category-label').textContent = project.category || 'Unspecified';
         document.getElementById('project-priority-label').textContent = project.priority || 'Medium';
         document.getElementById('project-timeline').textContent = `${formatDate(project.start_date)} — ${formatDate(project.end_date)}`;
-        document.getElementById('project-members-label').innerHTML = project.assigned_members.map(uid => `<span class="member-chip">${getMemberName(uid)}</span>`).join(' ');
+        const assignedMembers = project.assigned_members || [];
+        document.getElementById('project-members-label').innerHTML = assignedMembers.map(uid => `<span class="member-chip">${getMemberName(uid)}</span>`).join(' ');
 
         document.getElementById('project-total-tasks').textContent = tasks.length;
         document.getElementById('project-completed-tasks').textContent = completedTasks;
@@ -880,6 +1004,7 @@
                 todo: 'tasks-todo',
                 'in-progress': 'tasks-in-progress',
                 'in-review': 'tasks-review',
+                review: 'tasks-review',
                 blocked: 'tasks-blocked',
                 done: 'tasks-done'
             }[task.status] || 'tasks-todo';
@@ -903,7 +1028,7 @@
             taskRow.innerHTML = `
                 <div>
                     <h4>${task.name}</h4>
-                    <p>Due ${formatDate(task.due_date)} • ${task.members.length} assignee${task.members.length !== 1 ? 's' : ''}</p>
+                    <p>Due ${formatDate(task.due_date)} • ${(task.members || []).length} assignee${(task.members || []).length !== 1 ? 's' : ''}</p>
                 </div>
                 <span class="task-priority priority-${task.priority}">${task.priority}</span>
             `;
@@ -923,17 +1048,80 @@
         }, {});
         const memberCounts = {};
         tasks.forEach(task => {
-            task.members.forEach(uid => {
+            (task.members || []).forEach(uid => {
                 const name = getMemberName(uid);
                 memberCounts[name] = (memberCounts[name] || 0) + 1;
             });
         });
 
-        document.getElementById('report-task-health').textContent = `${statusCounts.done || 0} done, ${statusCounts['in-progress'] || 0} in progress, ${statusCounts['in-review'] || 0} in review, ${statusCounts.blocked || 0} blocked`;
+        const reviewCount = statusCounts['in-review'] || statusCounts.review || 0;
+        document.getElementById('report-task-health').textContent = `${statusCounts.done || 0} done, ${statusCounts['in-progress'] || 0} in progress, ${reviewCount} in review, ${statusCounts.blocked || 0} blocked`;
         document.getElementById('report-priority-breakdown').textContent = `High: ${priorityCounts.high || 0}, Medium: ${priorityCounts.medium || 0}, Low: ${priorityCounts.low || 0}`;
         document.getElementById('report-member-breakdown').textContent = Object.entries(memberCounts)
             .map(([name, count]) => `${name}: ${count}`)
             .join(' • ') || 'No tasks assigned yet';
+    }
+
+    function renderCurrentProjectView() {
+        if (!currentProject) return;
+        renderProjectSummary(currentProject);
+        renderProjectFiles(currentProject);
+        renderProjectTasks(currentProject);
+        renderBacklog(currentProject);
+        renderReports(currentProject);
+        makeTasksInteractive();
+    }
+
+    function syncProjectCard(project) {
+        const card = document.querySelector(`.project-card[data-project-uid="${project.project_uid}"]`);
+        if (!card) return;
+
+        const nameEl = card.querySelector('h4');
+        const meta = card.querySelector('.project-card-meta');
+        const desc = card.querySelector('p');
+
+        if (nameEl) nameEl.textContent = project.project_name;
+        if (desc) desc.textContent = project.project_description || '';
+
+        if (meta) {
+            const badges = meta.querySelectorAll('.badge');
+            if (badges[0]) badges[0].textContent = (project.status || 'No Status').replace('-', ' ').replace(/^\w/, c => c.toUpperCase());
+            if (badges[1]) badges[1].textContent = (project.category || 'Unspecified').replace('_', ' ').replace(/^\w/, c => c.toUpperCase());
+            const dateSpan = meta.querySelector('span:last-child');
+            if (dateSpan) {
+                dateSpan.textContent = project.end_date ? formatDate(project.end_date) : 'No deadline';
+            }
+        }
+
+        const status = project.status || '';
+        const targetColumnId = status === 'planning'
+            ? 'col-upcoming'
+            : (['active', 'on-hold'].includes(status) ? 'col-current'
+            : (['completed', 'cancelled'].includes(status) ? 'col-finished' : 'col-other'));
+
+        const targetColumn = document.getElementById(targetColumnId);
+        if (targetColumn && card.parentElement !== targetColumn) {
+            targetColumn.appendChild(card);
+        }
+    }
+
+    async function refreshCurrentProjectTasks() {
+        if (!currentProjectUid) return;
+        try {
+            const response = await fetch(`/projects/get_project_tasks/${encodeURIComponent(currentProjectUid)}`);
+            const data = await response.json();
+            if (!data.success) {
+                showStatusNotification(data.message || 'Unable to refresh tasks', 'error');
+                return;
+            }
+
+            currentProject.tasks = data.tasks || [];
+            renderCurrentProjectView();
+            updateOverviewStats();
+        } catch (error) {
+            console.error('Error refreshing tasks:', error);
+            showStatusNotification('Unable to refresh tasks', 'error');
+        }
     }
 
     function openProject(element) {
@@ -946,13 +1134,12 @@
 
         currentProjectUid = projectUid;
         currentProject = project;
+        const params = new URLSearchParams(window.location.search);
+        params.set('project_uid', projectUid);
+        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
         document.getElementById('task-view-project-name').textContent = project.project_name;
         document.getElementById('task-detail-card').style.display = 'none';
-        renderProjectSummary(project);
-        renderProjectFiles(project);
-        renderProjectTasks(project);
-        renderBacklog(project);
-        renderReports(project);
+        renderCurrentProjectView();
 
         document.getElementById('projects-table-view').style.display = 'none';
         document.getElementById('project-task-view').style.display = 'block';
@@ -962,13 +1149,24 @@
     function closeProject() {
         document.getElementById('projects-table-view').style.display = 'block';
         document.getElementById('project-task-view').style.display = 'none';
+        const params = new URLSearchParams(window.location.search);
+        params.delete('project_uid');
+        const query = params.toString();
+        const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+        window.history.replaceState({}, '', nextUrl);
     }
 
     function switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(panel => panel.style.display = 'none');
-        document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
-        document.getElementById(`tab-${tab}`).style.display = 'block';
+        const activeButton = document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`);
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
+        const activePanel = document.getElementById(`tab-${tab}`);
+        if (activePanel) {
+            activePanel.style.display = 'block';
+        }
     }
 
     function filterProjects() {
@@ -991,6 +1189,14 @@
             const title = card.querySelector('h4').textContent.toLowerCase();
             card.style.display = title.includes(query) ? 'flex' : 'none';
         });
+    }
+
+    const initialProjectUid = new URLSearchParams(window.location.search).get('project_uid');
+    if (initialProjectUid) {
+        const initialCard = document.querySelector(`.project-card[data-project-uid="${initialProjectUid}"]`);
+        if (initialCard) {
+            openProject(initialCard);
+        }
     }
 </script>
 
@@ -1019,6 +1225,105 @@
     createProjectBtn.addEventListener('click', openModal);
     overlay.addEventListener('click', closeModal);
     document.getElementById('close-create-project').addEventListener('click', closeModal);
+
+    const createProjectForm = document.getElementById('create-project-form');
+    const createProjectSubmit = document.getElementById('create-project-submit');
+    const categorySelect = document.getElementById('project-category');
+    const categoryCustomInput = document.getElementById('project-category-custom');
+    const memberNoneCheckbox = document.getElementById('member-none-checkbox');
+    const memberCheckboxes = Array.from(document.querySelectorAll('.project-member-checkbox'));
+    const memberNoneWrapper = document.getElementById('member-none-option');
+
+    function syncMemberNoneState() {
+        const anySelected = memberCheckboxes.some(checkbox => checkbox.checked);
+        if (anySelected) {
+            if (memberNoneCheckbox.checked) {
+                memberNoneCheckbox.checked = false;
+            }
+            memberNoneCheckbox.disabled = true;
+            if (memberNoneWrapper) {
+                memberNoneWrapper.classList.add('is-disabled');
+            }
+        } else {
+            memberNoneCheckbox.disabled = false;
+            if (memberNoneWrapper) {
+                memberNoneWrapper.classList.remove('is-disabled');
+            }
+        }
+    }
+
+    memberCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', syncMemberNoneState);
+    });
+
+    if (memberNoneCheckbox) {
+        memberNoneCheckbox.addEventListener('change', () => {
+            if (memberNoneCheckbox.checked) {
+                memberCheckboxes.forEach(checkbox => { checkbox.checked = false; });
+            }
+            syncMemberNoneState();
+        });
+    }
+
+    syncMemberNoneState();
+
+    if (categorySelect && categoryCustomInput) {
+        categorySelect.addEventListener('change', () => {
+            if (categorySelect.value === 'other') {
+                categoryCustomInput.style.display = 'block';
+                categoryCustomInput.focus();
+            } else {
+                categoryCustomInput.style.display = 'none';
+                categoryCustomInput.value = '';
+            }
+        });
+    }
+
+    if (createProjectForm) {
+        let isSubmitting = false;
+        createProjectForm.addEventListener('submit', event => {
+            const projectName = createProjectForm.querySelector('input[name="project-name"]')?.value.trim();
+            const deadline = createProjectForm.querySelector('input[name="deadline"]')?.value;
+
+            if (!projectName) {
+                event.preventDefault();
+                alert('Project name is required.');
+                return;
+            }
+
+            if (!deadline) {
+                event.preventDefault();
+                alert('Please select a deadline.');
+                return;
+            }
+
+            if (categorySelect?.value === 'other') {
+                const customValue = categoryCustomInput?.value.trim();
+                if (!customValue) {
+                    event.preventDefault();
+                    alert('Please enter a custom category.');
+                    return;
+                }
+                categoryCustomInput.value = customValue;
+            }
+
+            if (isSubmitting) {
+                event.preventDefault();
+                return;
+            }
+
+            isSubmitting = true;
+            if (createProjectSubmit) {
+                createProjectSubmit.disabled = true;
+                createProjectSubmit.textContent = 'Creating...';
+            }
+        });
+    }
+
+    const addTaskBtn = document.getElementById('add-task-btn');
+    if (addTaskBtn) {
+        addTaskBtn.addEventListener('click', addTask);
+    }
 </script>
 
 <!-- Task Management JavaScript -->
@@ -1036,44 +1341,6 @@
         document.querySelectorAll('.task-column').forEach(column => {
             column.addEventListener('dragover', handleDragOver);
             column.addEventListener('drop', handleDrop);
-        });
-    }
-
-    function showTaskStatusMenu(taskCard, task) {
-        const taskName = task.name;
-
-        const menu = document.createElement('div');
-        menu.className = 'status-menu';
-        menu.innerHTML = `
-            <div class="status-option" data-status="todo">To Do</div>
-            <div class="status-option" data-status="in-progress">In Progress</div>
-            <div class="status-option" data-status="review">Review</div>
-            <div class="status-option" data-status="done">Done</div>
-        `;
-
-        const rect = taskCard.getBoundingClientRect();
-        menu.style.position = 'absolute';
-        menu.style.left = `${rect.left}px`;
-        menu.style.top = `${rect.bottom + 8}px`;
-        menu.style.zIndex = '1000';
-
-        document.body.appendChild(menu);
-
-        menu.addEventListener('click', function(e) {
-            if (e.target.classList.contains('status-option')) {
-                const newStatus = e.target.dataset.status;
-                updateTaskStatus(taskName, newStatus);
-                document.body.removeChild(menu);
-            }
-        });
-
-        document.addEventListener('click', function closeMenu(e) {
-            if (!menu.contains(e.target) && e.target !== taskCard) {
-                if (document.body.contains(menu)) {
-                    document.body.removeChild(menu);
-                }
-                document.removeEventListener('click', closeMenu);
-            }
         });
     }
 
@@ -1106,7 +1373,7 @@
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
-                setTimeout(() => location.reload(), 1000);
+                refreshCurrentProjectTasks();
             } else {
                 showStatusNotification(data.message, 'error');
             }
@@ -1132,7 +1399,11 @@
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
-                setTimeout(() => location.reload(), 1000);
+                if (currentProject && currentProject.project_uid === projectUid) {
+                    currentProject.status = newStatus;
+                    syncProjectCard(currentProject);
+                    renderCurrentProjectView();
+                }
             } else {
                 showStatusNotification(data.message, 'error');
             }
@@ -1168,6 +1439,7 @@
     }
 
     function getValidStatusTransitions(currentStatus, isProject) {
+        const normalizedStatus = currentStatus === 'review' ? 'in-review' : currentStatus;
         const transitions = {
             project: {
                 planning: ['active', 'cancelled'],
@@ -1184,13 +1456,18 @@
                 blocked: ['todo', 'in-progress']
             }
         };
-        return transitions[isProject ? 'project' : 'task'][currentStatus] || [];
+        return transitions[isProject ? 'project' : 'task'][normalizedStatus] || [];
     }
 
     function showTaskStatusMenu(taskCard, task) {
         const taskName = task.name;
-        const currentStatus = task.status;
+        const currentStatus = task.status === 'review' ? 'in-review' : task.status;
         const validTransitions = getValidStatusTransitions(currentStatus, false);
+
+        const existingMenu = document.querySelector('.status-menu');
+        if (existingMenu) {
+            existingMenu.remove();
+        }
 
         const menu = document.createElement('div');
         menu.className = 'status-menu';
@@ -1211,13 +1488,24 @@
             ).join('');
         }
 
-        const rect = taskCard.getBoundingClientRect();
+        const anchor = taskCard.querySelector('.task-status-btn') || taskCard;
+        const rect = anchor.getBoundingClientRect();
         menu.style.position = 'fixed';
-        menu.style.left = `${rect.left}px`;
-        menu.style.top = `${rect.bottom + 8}px`;
-        menu.style.zIndex = '1000';
-
+        menu.style.visibility = 'hidden';
+        menu.style.zIndex = '1100';
         document.body.appendChild(menu);
+
+        const menuWidth = menu.offsetWidth;
+        const menuHeight = menu.offsetHeight;
+        const padding = 12;
+        const fitsRight = rect.right + menuWidth + padding <= window.innerWidth;
+        const left = fitsRight ? rect.right + 8 : Math.max(padding, rect.left - menuWidth - 8);
+        const fitsBelow = rect.bottom + menuHeight + padding <= window.innerHeight;
+        const top = fitsBelow ? rect.bottom + 8 : Math.max(padding, rect.top - menuHeight - 8);
+
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+        menu.style.visibility = 'visible';
 
         menu.addEventListener('click', function(e) {
             if (e.target.classList.contains('status-option') && !e.target.classList.contains('unavailable')) {
@@ -1261,13 +1549,27 @@
     }
 
     // Add new task functionality
-    document.querySelector('.create-task-btn').addEventListener('click', function() {
-        showAddTaskModal();
-    });
+    const createTaskBtn = document.querySelector('.create-task-btn');
+    if (createTaskBtn) {
+        createTaskBtn.addEventListener('click', function() {
+            showAddTaskModal();
+        });
+    }
+
+    const changeStatusBtn = document.getElementById('change-project-status');
+    if (changeStatusBtn) {
+        changeStatusBtn.addEventListener('click', function() {
+            showProjectStatusPopup();
+        });
+    }
 
     function showAddTaskModal() {
+        if (!currentProjectUid) {
+            showStatusNotification('Select a project first before adding a task.', 'error');
+            return;
+        }
         const modal = document.createElement('div');
-        modal.className = 'modal';
+        modal.className = 'modal show';
         modal.innerHTML = `
             <div class="modal-content">
                 <span class="close">&times;</span>
@@ -1279,6 +1581,7 @@
                         <option value="medium" selected>Medium Priority</option>
                         <option value="high">High Priority</option>
                     </select>
+                    <label for="task-due-date">Deadline</label>
                     <input type="date" id="task-due-date" required>
                     <div id="task-members">
                         <label><input type="checkbox" value="{{ user.uid }}" checked> {{ user.name }} (You)</label>
@@ -1294,6 +1597,11 @@
         `;
 
         document.body.appendChild(modal);
+        modal.addEventListener('click', event => {
+            if (event.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
 
         // Handle form submission
         modal.querySelector('#add-task-form').addEventListener('submit', function(e) {
@@ -1332,7 +1640,8 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                location.reload();
+                showStatusNotification('Task added successfully', 'success');
+                refreshCurrentProjectTasks();
             } else {
                 alert('Error adding task: ' + data.message);
             }
@@ -1343,36 +1652,11 @@
         });
     }
 
-    // Initialize interactive elements when project is opened
-    const originalOpenProject = window.openProject;
-    window.openProject = function(element) {
-        originalOpenProject(element);
-        currentProjectUid = element.getAttribute('data-project-uid');
-        // Wait a bit for DOM to update, then make tasks interactive
-        setTimeout(makeTasksInteractive, 100);
-    };
+    // Task rendering already rebinds interactions after updates.
 </script>
 
 <!-- Status Menu Styles -->
 <style>
-    .status-menu {
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        min-width: 150px;
-    }
-
-    .status-option {
-        padding: 10px 15px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-
-    .status-option:hover {
-        background-color: #f8f9fa;
-    }
-
     .task-card {
         cursor: pointer;
         transition: all 0.2s;
@@ -1412,32 +1696,36 @@
     .task-card-actions button,
     .task-view-actions button,
     .status-options button {
-        border: none;
-        background: #e2e8f0;
+        border: 1px solid #e2e8f0;
+        background: #f1f5f9;
         color: #0f172a;
-        border-radius: 6px;
-        padding: 0.45rem 0.75rem;
-        margin-left: 0.4rem;
+        border-radius: 999px;
+        padding: 0.35rem 0.7rem;
+        margin-left: 0;
         cursor: pointer;
-        transition: background 0.15s ease;
-        font-size: 0.9rem;
+        transition: background 0.15s ease, transform 0.15s ease;
+        font-size: 0.75rem;
+        font-weight: 600;
+        white-space: nowrap;
     }
 
     .task-card-actions button:hover,
     .task-view-actions button:hover,
     .status-options button:hover {
-        background: #cbd5e1;
+        background: #e2e8f0;
+        transform: translateY(-1px);
     }
 
     .delete-project-btn,
     .task-delete-btn {
-        background: #fecaca;
+        background: #fee2e2;
         color: #991b1b;
+        border-color: #fecaca;
     }
 
     .delete-project-btn:hover,
     .task-delete-btn:hover {
-        background: #fca5a5;
+        background: #fecaca;
     }
 
     .status-options {
@@ -1537,15 +1825,16 @@
         border: 1px solid #e5e7eb;
         border-radius: 12px;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        min-width: 200px;
+        min-width: 180px;
         position: absolute;
         top: 100%;
         left: 0;
         z-index: 1000;
         margin-top: 0.5rem;
         overflow: hidden;
-        max-height: 300px;
+        max-height: 240px;
         overflow-y: auto;
+        padding: 0.25rem 0;
     }
 
     .status-menu.hidden {
@@ -1553,11 +1842,12 @@
     }
 
     .status-option {
-        padding: 0.75rem 1rem;
+        padding: 0.6rem 0.9rem;
         cursor: pointer;
         transition: all 0.2s;
         border-left: 3px solid transparent;
         font-weight: 500;
+        white-space: nowrap;
     }
 
     .status-option:hover {
