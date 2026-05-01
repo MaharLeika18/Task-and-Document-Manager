@@ -55,7 +55,7 @@ login_form.addEventListener('submit', async (e) => {
 
         const data = await sendLoginToken(token);
         if (data.success) {
-            alert("Log-in successful!");
+            // alert("Log-in successful!");         Seems unnecessary
             window.location.href = "/home";
         } else {
             alert("Login failed: " + (data.error || data.message || 'Unknown error'));
@@ -78,7 +78,7 @@ google_reg.addEventListener("click", async (e) => {
 
         const data = await sendLoginToken(token);
         if (data.success) {
-            alert("Log-in successful!");
+            // alert("Log-in successful!");
             window.location.href = "/home";
         } else {
             alert("Login failed: " + (data.error || data.message || 'Unknown error'));

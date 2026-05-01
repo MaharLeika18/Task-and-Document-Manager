@@ -281,7 +281,7 @@
         <div class="profile-hero">
             <div class="profile-avatar">
                 {% if profile.picture %}
-                    <img src="{{ profile.picture }}" alt="{{ profile.name }}">
+                    <img src="{{ profile.picture }}" referrerpolicy="no-referrer" alt="{{ profile.name }}">
                 {% else %}
                     <span>{{ (profile.name or user.name)[0]|upper }}</span>
                 {% endif %}
@@ -336,7 +336,7 @@
 
             <div class="field-group">
                 <label for="picture_url">Profile Photo URL</label>
-                <input id="picture_url" name="picture_url" type="url" value="{{ profile.picture }}" placeholder="https://example.com/avatar.png">
+                <input id="picture_url" name="picture_url" type="url" value="{{ profile.picture }}" placeholder="https://example.com/avatar.png" referrerpolicy="no-referrer">
                 <p class="help-text">If you want to use your Google account photo, click the button below. A blank field will show initials on the members page.</p>
             </div>
 

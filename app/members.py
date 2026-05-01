@@ -10,6 +10,7 @@ from .google_services import (
     get_users,
     update_user_profile,
 )
+from .firebase_run import db
 
 # Create a blueprint named 'members'
 members_bp = Blueprint('members', __name__, url_prefix='/')
@@ -89,15 +90,40 @@ def profile():
             file_storage = request.files.get('profile_photo')
             upload_result = upload_profile_photo_to_drive(file_storage, user['uid'])
             if upload_result.get('success'):
-                file_data = upload_result.get('file', {})
-                picture_url = file_data.get('webViewLink') or file_data.get('webContentLink')
+                session["picture"] = upload_result["picture_url"] 
+                picture_url = upload_result["picture_url"]  
+                db.collection("users").document(user['uid']).update({
+                    "picture": picture_url,
+                    "photo_source": "custom"
+                })
                 photo_source = 'custom'
                 flash('Profile photo uploaded successfully.', 'success')
             else:
                 flash(upload_result.get('message', 'Failed to upload profile photo.'), 'error')
         elif photo_action == 'google':
-            picture_url = session.get('picture', '')
-            photo_source = 'google'
+            # Get google photo 
+            user_doc = db.collection("users").document(user['uid']).get()
+
+            google_picture = ""
+            if user_doc.exists:
+                google_picture = user_doc.to_dict().get("google_picture", "")
+
+            if not google_picture:
+                flash("No Google profile picture found.", "error")
+            else:
+                picture_url = google_picture
+                photo_source = 'google'
+
+                # Update session
+                session["picture"] = picture_url
+
+                # Update active picture
+                db.collection("users").document(user['uid']).update({
+                    "picture": picture_url,
+                    "photo_source": "google"
+                })
+
+                flash("Switched to Google profile picture.", "success")
         else:
             photo_source = 'google' if picture_url and picture_url == session.get('picture', '') else 'custom'
 

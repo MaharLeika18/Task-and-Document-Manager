@@ -23,7 +23,11 @@ def register():
         decoded = verify_id_token_with_retry(token)
         session["uid"] = decoded["uid"]
         session["email"] = decoded.get("email")
-        session["name"] = decoded.get("name")
+        session["name"] = (
+            decoded.get("name") or 
+            user_data.get("display_name") or 
+            "User"
+        )
         session['picture'] = decoded.get("picture")
         session["current_session_id"] = generate_secure_string(20)
         
@@ -37,7 +41,8 @@ def register():
                 'email': decoded.get("email"),
                 'date_created': user_data.get('date_created', ''),
                 'picture': decoded.get("picture", ''),
-                'photo_source': 'google'
+                'google_picture': decoded.get("picture", ""),
+                'photo_source': 'google' if decoded.get("firebase", {}).get("sign_in_provider") == "google.com" else 'email'
             })
         
         return jsonify(success=True)

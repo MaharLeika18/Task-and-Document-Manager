@@ -13,7 +13,7 @@ def index():
     # You can render templates and pass variables to them
     return render_template('login.html')
 
-#after registering, magstore ng session data yung user sa session hehehe which we'll be using sa code
+# after registering, magstore ng session data yung user sa session hehehe which we'll be using sa code
 # yung session data is while they're logged in, pag naglogout sila, 
 # mawawala yung session data nila sa session na iclear natin sa logout route hehe
 # cache natin toh techniccalllyy??? HAHAHAHAHA IDDK MAN TS CRAZY

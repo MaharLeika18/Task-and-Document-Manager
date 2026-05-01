@@ -8,6 +8,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from .firebase_run import db
 
 dotenv.load_dotenv()
 
@@ -237,7 +238,6 @@ def get_drive_file_metadata(file_id):
             'message': str(error)
         }
 
-
 def get_drive_folder_metadata(folder_id):
     try:
         service = gdrive_service()
@@ -353,19 +353,38 @@ def upload_profile_photo_to_drive(file_storage, user_uid):
             }
 
         service = gdrive_service()
-        profile_photos_folder_id = os.getenv('PROFILE_PHOTOS_FOLDER_ID')
-        
+
+        # Get folder ID from Firestore
+        config_ref = db.collection("app_config").document("drive")
+        config_doc = config_ref.get()
+
+        profile_photos_folder_id = None
+        if config_doc.exists:
+            profile_photos_folder_id = config_doc.to_dict().get("profile_photos_folder_id")        
+
         if not profile_photos_folder_id:
             # Create profile photos folder if it doesn't exist
             parent_folder = os.getenv('COUNCILOG_GDRIVE_FOLDER_ID')
             folder_result = create_drive_folder('Profile Photos', parent_folder)
-            if not folder_result.get('success'):
+            
+            folder = folder_result.get('folder', {})
+
+            profile_photos_folder_id = (
+                folder.get('file_id') or 
+                folder.get('id')
+            )
+
+            # Save folder ID to Firestore
+            db.collection("app_config").document("drive").set({
+                "profile_photos_folder_id": profile_photos_folder_id
+            }, merge=True)
+
+            if not profile_photos_folder_id:
                 return {
                     'success': False,
-                    'message': 'Could not create profile photos folder'
-                }
-            profile_photos_folder_id = folder_result['folder']['id']
-        
+                    'message': 'Folder ID missing'
+            }
+
         # Create user-specific folder or use user_uid as part of filename
         filename = f"{user_uid}_{file_storage.filename}"
         
@@ -386,11 +405,30 @@ def upload_profile_photo_to_drive(file_storage, user_uid):
             fields='id,name,webViewLink,webContentLink'
         ).execute()
 
+        file_id = created.get('id')
+        drive_url = f"https://lh3.googleusercontent.com/d/{file_id}"
+
+        # Make file public
+        service.permissions().create(
+            fileId=created.get('id'),
+            body={
+                'type': 'anyone',
+                'role': 'reader'
+            }
+        ).execute()
+
+        # Update user profile
+        db.collection("users").document(user_uid).update({
+            "picture": drive_url
+        })
+
         return {
             'success': True,
-            'file_id': created.get('id'),
+            'file_id': file_id,
+            'picture_url': drive_url,
             'file': _serialize_drive_item(created)
-        }
+        }    
+        
     except Exception as error:
         print(f'Error uploading profile photo to Google Drive: {error}')
         return {
