@@ -24,6 +24,7 @@
         padding: 1.5rem;
         position: sticky;
         top: 1rem;
+        width: 100%;
     }
 
     .profile-hero {
@@ -188,9 +189,10 @@
 
     .info-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(3, 1fr);
         gap: 0.75rem;
         margin: 1rem 0 1.25rem;
+        width: 100%;
     }
 
     .info-card {
@@ -198,6 +200,7 @@
         border-radius: 16px;
         background: #f8fafc;
         border: 1px solid #e5e7eb;
+        min-width: 0;
     }
 
     .info-card span {
@@ -281,7 +284,7 @@
         <div class="profile-hero">
             <div class="profile-avatar">
                 {% if profile.picture %}
-                    <img src="{{ profile.picture }}" referrerpolicy="no-referrer" alt="{{ profile.name }}">
+                    <img src="{{ profile.picture or '/static/default-avatar.png' }}" referrerpolicy="no-referrer" onerror="this.src='/static/default-avatar.png'" alt="{{ profile.name }}">
                 {% else %}
                     <span>{{ (profile.name or user.name)[0]|upper }}</span>
                 {% endif %}
@@ -308,7 +311,7 @@
             </div>
             <div class="info-card">
                 <span>User ID</span>
-                <strong style="word-break:break-all;">{{ profile.uid }}</strong>
+                <strong style="overflow-wrap:anywhere;">{{ profile.uid }}</strong>
             </div>
         </div>
 

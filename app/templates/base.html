@@ -36,7 +36,7 @@
             <button class="mail-button" title="Messages">
                 <span class="material-symbols-outlined">mail</span>
             </button> #}
-            <a href="{{ url_for('members.profile') }}" class="profile-button"><img src="{{ session_data().get('picture') }}" referrerpolicy="no-referrer" alt="Profile"></a>
+            <a href="{{ url_for('members.profile') }}" class="profile-button"><img src="{{ session_data().get('picture') or '/static/default-avatar.png'}}" onerror="this.src='/static/default-avatar.png'" referrerpolicy="no-referrer" alt="Profile"></a>
         </div>
         {# <div class="logos">
             <h2>Task Manager</h2>
@@ -50,6 +50,18 @@
             <li><a href="{{ url_for('members.members') }}" id="members" class="{% if request.endpoint == 'members.members' %}active{% endif %}">Members</a></li>
             <li><a href="{{ url_for('calendar.calendar') }}" id="calendar" class="{% if request.endpoint == 'calendar.calendar' %}active{% endif %}">Calendar</a></li>
             <li><a href="{{ url_for('files.files') }}" id="files" class="{% if request.endpoint == 'files.files' %}active{% endif %}">Files</a></li>
+        <div class="dailies">
+            <div class="add-dailies">
+                <button id="add-daily-btn" title="Add Daily">
+                    <span class="material-symbols-outlined">add</span>
+                </button>
+            </div>
+            <h1>Dailies</h1>
+            <div class="dailies-list">
+                <!-- Daily items will be populated here -->
+            </div>
+        </div>
+
         <div class="logout">
             <button id="logout_btn">
                 <span class="material-symbols-outlined">logout</span> Logout
