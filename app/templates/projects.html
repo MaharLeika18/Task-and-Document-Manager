@@ -212,7 +212,7 @@
                 <div class="task-view-actions">
                     <button type="button" onclick="closeProject()">← BACK TO PROJECTS</button>
                     <button type="button" class="edit-project-btn" onclick="showEditProjectModal()">✎ Edit Project</button>
-                    <button type="button" class="edit-project-btn" id="change-project-status" onclick="showProjectStatusPopup()">⚙️ Change Status</button>
+                    <!-- <button type="button" class="edit-project-btn" id="change-project-status" onclick="showProjectStatusPopup()">⚙️ Change Status</button> -->
                     <button type="button" class="delete-project-btn" onclick="confirmDeleteProject()">🗑️ Delete Project</button>
                 </div>
                 <div>
@@ -732,7 +732,12 @@
             },
             body: JSON.stringify(payload)
         })
-        .then(response => response.json())
+        .then(response => {
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
+             return response.json();
+         })
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
@@ -771,7 +776,12 @@
             },
             body: JSON.stringify(payload)
         })
-        .then(response => response.json())
+        .then(response => {
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
+             return response.json();
+         })
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
@@ -802,7 +812,12 @@
             },
             body: JSON.stringify({ project_uid: projectUid })
         })
-        .then(response => response.json())
+        .then(response => {
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
+             return response.json();
+         })
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
@@ -840,7 +855,12 @@
             },
             body: JSON.stringify({ project_uid: currentProjectUid, task_name: taskName })
         })
-        .then(response => response.json())
+        .then(response => {
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
+             return response.json();
+         })
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
@@ -1109,6 +1129,9 @@
         if (!currentProjectUid) return;
         try {
             const response = await fetch(`/projects/get_project_tasks/${encodeURIComponent(currentProjectUid)}`);
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
             const data = await response.json();
             if (!data.success) {
                 showStatusNotification(data.message || 'Unable to refresh tasks', 'error');
@@ -1369,7 +1392,12 @@
                 status: newStatus
             })
         })
-        .then(response => response.json())
+        .then(response => {
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
+             return response.json();
+         })
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
@@ -1395,7 +1423,12 @@
                 status: newStatus
             })
         })
-        .then(response => response.json())
+        .then(response => {
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
+             return response.json();
+         })
         .then(data => {
             if (data.success) {
                 showStatusNotification(data.message, 'success');
@@ -1637,7 +1670,12 @@
                 members: members
             })
         })
-        .then(response => response.json())
+        .then(response => {
+             if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+             }
+             return response.json();
+         })
         .then(data => {
             if (data.success) {
                 showStatusNotification('Task added successfully', 'success');
@@ -1910,3 +1948,4 @@
 </style>
 
 {% endblock %}
+
