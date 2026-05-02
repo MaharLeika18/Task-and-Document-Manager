@@ -291,11 +291,12 @@ body::after {
 }
 
 .buttons ul {
-    list-style: none;
+    list-style-type: none;
 }
 
 .buttons li {
     margin-bottom: 0.4rem;
+    list-style-type: none;
 }
 
 .buttons a {
