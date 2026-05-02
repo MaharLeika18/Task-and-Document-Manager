@@ -38,9 +38,7 @@
             </button> #}
             <a href="{{ url_for('members.profile') }}" class="profile-button"><img src="{{ session_data().get('picture') or '/static/default-avatar.png'}}" onerror="this.src='/static/default-avatar.png'" referrerpolicy="no-referrer" alt="Profile"></a>
         </div>
-        {# <div class="logos">
-            <h2>Task Manager</h2>
-        </div> #}
+
     </nav>
 
     <div class="side-bar">
