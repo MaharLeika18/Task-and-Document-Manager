@@ -1435,10 +1435,10 @@ body::after {
 
 /* === Auth Pages === */
 .auth-container {
-    max-width: 500px;
+    max-width: 400px;
     align-content: center;
     margin: 5rem auto;
-    margin-left: 12rem;
+    margin-left: 15rem;
     padding: 2.5rem;
     background: rgba(255, 255, 255, 0.55);
     backdrop-filter: blur(28px) saturate(160%);
