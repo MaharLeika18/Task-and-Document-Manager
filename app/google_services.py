@@ -351,7 +351,11 @@ def get_user_calendar_events(user_uid):
 
         for doc in docs:
             project_data = doc.to_dict()
-            if user_uid not in project_data.get('assigned_members', []):
+            assigned_members = project_data.get('assigned_members', [])
+            project_maker_uid = project_data.get('project_maker_uid')
+            is_project_owner = user_uid == project_maker_uid
+
+            if not is_project_owner and user_uid not in assigned_members:
                 continue
 
             project_uid = project_data.get('project_uid')
@@ -389,7 +393,7 @@ def get_user_calendar_events(user_uid):
 
             # Add task deadlines
             for task in project_data.get('tasks', []):
-                if user_uid not in task.get('members', []):
+                if not is_project_owner and user_uid not in task.get('members', []):
                     continue
                 due_date = task.get('due_date') or project_end
                 if not due_date:

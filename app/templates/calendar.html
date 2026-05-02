@@ -85,6 +85,10 @@
         transform: translateY(-2px);
     }
 
+    .calendar-day.has-events {
+        box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.12);
+    }
+
     .calendar-day.other-month {
         background: #f9fafb;
         color: #d1d5db;
@@ -218,6 +222,97 @@
 
     .event-card.task {
         border-left: 4px solid #be185d;
+    }
+
+    .upcoming-list {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .upcoming-group {
+        padding: 0.9rem 1rem;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+    }
+
+    .upcoming-group-date {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #4f46e5;
+        margin-bottom: 0.6rem;
+    }
+
+    .upcoming-bullet-list {
+        margin: 0;
+        padding-left: 1.2rem;
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .upcoming-bullet-list li {
+        color: #111827;
+        line-height: 1.4;
+    }
+
+    .upcoming-item-main {
+        font-weight: 600;
+    }
+
+    .upcoming-item-meta {
+        display: block;
+        font-size: 0.82rem;
+        color: #6b7280;
+        margin-top: 0.15rem;
+    }
+
+    .upcoming-item-type {
+        display: inline-block;
+        margin-left: 0.35rem;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 0.72rem;
+        font-weight: 700;
+        vertical-align: middle;
+    }
+
+    .calendar-tooltip {
+        position: fixed;
+        z-index: 2200;
+        display: none;
+        max-width: 340px;
+        background: rgba(17, 24, 39, 0.96);
+        color: white;
+        border-radius: 14px;
+        padding: 0.9rem 1rem;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+        pointer-events: none;
+        transform: translateY(6px);
+    }
+
+    .calendar-tooltip.show {
+        display: block;
+    }
+
+    .calendar-tooltip-title {
+        font-weight: 700;
+        margin-bottom: 0.6rem;
+        font-size: 0.95rem;
+    }
+
+    .calendar-tooltip-list {
+        list-style: disc;
+        padding-left: 1.1rem;
+        margin: 0;
+        display: grid;
+        gap: 0.45rem;
+    }
+
+    .calendar-tooltip-list li {
+        font-size: 0.82rem;
+        line-height: 1.35;
     }
 
     .event-name {
@@ -538,12 +633,15 @@
     </div>
 
     <div class="sidebar">
-        <h2>📅 Upcoming</h2>
+        <h2>📅 Events List</h2>
         <div id="events-list">
             <!-- Events will be populated here -->
         </div>
     </div>
 </div>
+
+<div id="calendar-tooltip" class="calendar-tooltip" aria-hidden="true"></div>
+<script type="application/json" id="calendar-users-data">{{ users | tojson | safe }}</script>
 
 <!-- Event Detail Modal -->
 <div id="event-modal" class="modal">
@@ -574,6 +672,10 @@
     const nextButton = document.getElementById('next-month');
     const eventsList = document.getElementById('events-list');
     const eventModal = document.getElementById('event-modal');
+    const calendarTooltip = document.getElementById('calendar-tooltip');
+    const calendarUsersData = document.getElementById('calendar-users-data');
+    const calendarUsers = calendarUsersData ? JSON.parse(calendarUsersData.textContent || '[]') : [];
+    const userNameById = new Map(calendarUsers.map(user => [user.uid, user.name || user.display_name || user.username || user.email || user.uid]));
 
     let currentDate = new Date();
     let calendarEvents = [];
@@ -584,6 +686,130 @@
         if (event.type === 'task') return 'task';
         if (event.type === 'google_calendar') return 'google_calendar';
         return '';
+    }
+
+    function getEventTypeLabel(event) {
+        if (event.type === 'project_created') return 'Created';
+        if (event.type === 'project') return 'Project';
+        if (event.type === 'task') return 'Task';
+        return 'Calendar';
+    }
+
+    function normalizeDateKey(value) {
+        if (!value) return '';
+        if (typeof value === 'string') {
+            return value.split('T')[0];
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function getEventDateKey(event) {
+        return normalizeDateKey(event.start_date || event.due_date || event.created_date || event.event_date || event.end_date || '');
+    }
+
+    function formatDateKey(dateKey, options = {}) {
+        if (!dateKey) return 'No date';
+        return new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-US', {
+            weekday: options.weekday ? 'long' : undefined,
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    }
+
+    function formatEventMeta(event) {
+        const parts = [];
+        if (event.project) parts.push(event.project);
+        if (event.status) parts.push(event.status.replace('-', ' ').toUpperCase());
+        if (event.priority) parts.push(`${event.priority.charAt(0).toUpperCase() + event.priority.slice(1)} priority`);
+        return parts.join(' • ');
+    }
+
+    function getEventSummaryText(event) {
+        const description = (event.description || '').trim();
+        if (description) {
+            return description.length > 110 ? `${description.slice(0, 110)}...` : description;
+        }
+        if (event.project && event.type === 'task') {
+            return `Project: ${event.project}`;
+        }
+        if (event.project && event.type === 'project') {
+            return event.project;
+        }
+        return '';
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatMemberName(member) {
+        if (!member) return '';
+        if (typeof member === 'object') {
+            return member.name || member.display_name || member.username || member.uid || '';
+        }
+        return userNameById.get(member) || member;
+    }
+
+    function formatTooltipLine(event) {
+        const label = getEventTypeLabel(event);
+        const main = event.title || 'Untitled';
+        const meta = [];
+        if (event.project && event.type !== 'project') meta.push(event.project);
+        if (event.status) meta.push(event.status.replace('-', ' ').toUpperCase());
+        if (event.priority) meta.push(event.priority.charAt(0).toUpperCase() + event.priority.slice(1));
+        const summary = getEventSummaryText(event);
+        return `<li><strong>${label}:</strong> ${main}${meta.length ? `<span class="upcoming-item-meta">${meta.join(' • ')}</span>` : ''}${summary ? `<span class="upcoming-item-meta">${summary}</span>` : ''}</li>`;
+    }
+
+    function ensureCalendarTooltip() {
+        return calendarTooltip || document.getElementById('calendar-tooltip');
+    }
+
+    function hideCalendarTooltip() {
+        const tooltip = ensureCalendarTooltip();
+        if (!tooltip) return;
+        tooltip.classList.remove('show');
+        tooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    function showCalendarTooltip(anchor, dateKey, dayEvents) {
+        const tooltip = ensureCalendarTooltip();
+        if (!tooltip || !anchor || !dayEvents || !dayEvents.length) return;
+
+        tooltip.innerHTML = `
+            <div class="calendar-tooltip-title">${formatDateKey(dateKey)}</div>
+            <ul class="calendar-tooltip-list">
+                ${dayEvents.slice(0, 6).map(formatTooltipLine).join('')}
+                ${dayEvents.length > 6 ? `<li>+${dayEvents.length - 6} more item(s)</li>` : ''}
+            </ul>
+        `;
+
+        tooltip.classList.add('show');
+        tooltip.setAttribute('aria-hidden', 'false');
+
+        const rect = anchor.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const offset = 12;
+        let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+        let top = rect.top - tooltipRect.height - offset;
+
+        if (left < 8) left = 8;
+        if (left + tooltipRect.width > window.innerWidth - 8) left = window.innerWidth - tooltipRect.width - 8;
+        if (top < 8) top = rect.bottom + offset;
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
     }
 
     function formatDateRange(startDate, endDate) {
@@ -676,12 +902,13 @@
 
         // Add members if available
         if (event.members && event.members.length > 0) {
+            const memberNames = event.members.map(formatMemberName).filter(Boolean);
             detailsHTML += `
                 <div class="event-detail-row">
                     <div class="event-detail-label">Assigned To</div>
                     <div class="event-detail-value">
                         <div class="event-members">
-                            ${event.members.map(member => `<span class="member-badge">${member}</span>`).join('')}
+                            ${memberNames.map(member => `<span class="member-badge">${escapeHtml(member)}</span>`).join('')}
                         </div>
                     </div>
                 </div>
@@ -769,13 +996,11 @@
             dayNumber.textContent = day.getDate();
             dayElement.appendChild(dayNumber);
 
-            const dateKey = day.toISOString().split('T')[0];
-            const dayEvents = calendarEvents.filter(event => {
-                const eventDate = event.start_date || event.due_date || event.created_date || event.event_date;
-                return eventDate === dateKey;
-            });
+            const dateKey = normalizeDateKey(day);
+            const dayEvents = calendarEvents.filter(event => getEventDateKey(event) === dateKey);
             
             if (dayEvents.length > 0) {
+                dayElement.classList.add('has-events');
                 if (dayEvents.some(e => e.type === 'task' && (e.status === 'done' || e.status === 'completed'))) {
                     dayElement.classList.add('completed');
                 }
@@ -816,6 +1041,15 @@
 
             // Make entire day clickable to show day events
             dayElement.style.cursor = 'pointer';
+            dayElement.addEventListener('mouseenter', () => {
+                if (dayEvents.length > 0) showCalendarTooltip(dayElement, dateKey, dayEvents);
+            });
+            dayElement.addEventListener('mousemove', () => {
+                if (dayEvents.length > 0 && calendarTooltip.classList.contains('show')) {
+                    showCalendarTooltip(dayElement, dateKey, dayEvents);
+                }
+            });
+            dayElement.addEventListener('mouseleave', hideCalendarTooltip);
             dayElement.onclick = () => {
                 if (dayEvents.length > 0) {
                     showDayEventsModal(dateKey, dayEvents);
@@ -895,37 +1129,67 @@
             return;
         }
 
+        const grouped = new Map();
         upcoming.slice(0, 15).forEach(event => {
-            const card = document.createElement('div');
-            const typeClass = getEventTypeClass(event);
-            card.className = `event-card ${typeClass}`;
-            card.dataset.eventId = event.id;
-            card.style.cursor = 'pointer';
-            card.onclick = () => showEventModal(event);
-            
-            const eventDate = event.start_date || event.due_date || event.created_date || event.event_date;
-            let badges = '';
-            
-            if (event.type === 'task') {
-                if (event.status === 'done' || event.status === 'completed') {
-                    badges += '<span class="event-badge completed">✓ Done</span>';
+            const dateKey = getEventDateKey(event);
+            if (!grouped.has(dateKey)) grouped.set(dateKey, []);
+            grouped.get(dateKey).push(event);
+        });
+
+        grouped.forEach((groupEvents, dateKey) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'upcoming-group';
+
+            const dateHeading = document.createElement('div');
+            dateHeading.className = 'upcoming-group-date';
+            dateHeading.textContent = formatDateKey(dateKey);
+            wrapper.appendChild(dateHeading);
+
+            const list = document.createElement('ul');
+            list.className = 'upcoming-bullet-list';
+
+            groupEvents.forEach(event => {
+                const typeClass = getEventTypeClass(event);
+                const meta = formatEventMeta(event);
+                const summary = getEventSummaryText(event);
+
+                const item = document.createElement('li');
+                item.dataset.eventId = event.id;
+                item.className = `event-card ${typeClass}`;
+                item.style.cursor = 'pointer';
+                item.style.listStyle = 'disc';
+
+                const main = document.createElement('span');
+                main.className = 'upcoming-item-main';
+                main.textContent = event.title || 'Untitled';
+                item.appendChild(main);
+
+                const typeBadge = document.createElement('span');
+                typeBadge.className = 'upcoming-item-type';
+                typeBadge.textContent = getEventTypeLabel(event);
+                item.appendChild(typeBadge);
+
+                if (meta) {
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'upcoming-item-meta';
+                    metaSpan.textContent = meta;
+                    item.appendChild(metaSpan);
                 }
-                if (event.priority === 'high') {
-                    badges += '<span class="event-badge urgent">⚠ Urgent</span>';
+
+                if (summary) {
+                    const summarySpan = document.createElement('span');
+                    summarySpan.className = 'upcoming-item-meta';
+                    summarySpan.textContent = summary;
+                    item.appendChild(summarySpan);
                 }
-            }
-            
-            let typeLabel = event.type === 'project_created' ? 'Created' : 
-                           event.type === 'project' ? 'Project' : 
-                           event.type === 'task' ? 'Task' : 'Calendar Event';
-            
-            card.innerHTML = `
-                <div class="event-name">${event.title}</div>
-                <div class="event-date">${eventDate}</div>
-                ${event.project ? `<div class="event-meta">${event.project}</div>` : ''}
-                ${badges ? `<div class="event-meta">${badges}</div>` : ''}
-            `;
-            eventsList.appendChild(card);
+
+                item.addEventListener('click', () => showEventModal(event));
+                list.appendChild(item);
+            });
+
+            wrapper.appendChild(list);
+
+            eventsList.appendChild(wrapper);
         });
     }
 
@@ -974,5 +1238,7 @@
     // Refresh calendar every 30 seconds to sync with Google Calendar
     refreshCalendar();
     setInterval(refreshCalendar, 30000);
+
+    document.addEventListener('mouseleave', hideCalendarTooltip);
 </script>
 {% endblock %}

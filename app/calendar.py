@@ -8,12 +8,12 @@ from .google_services import get_user_calendar_events, merge_calendar_events, ge
 # Create a blueprint named 'calendar'
 calendar_bp = Blueprint('calendar', __name__, url_prefix='/')
 
-@calendar_bp.route('/calendar', methods=['GET'])
+@calendar_bp.route('/', methods=['GET'])
 @auth_required
 def calendar(): 
-    return render_template("calendar.html", user=inject_session_data())
+    return render_template("calendar.html", user=inject_session_data(), users=get_users())
 
-@calendar_bp.route('/calendar/events', methods=['GET'])
+@calendar_bp.route('/events', methods=['GET'])
 @auth_required
 def calendar_events():
     user_uid = session['uid']
