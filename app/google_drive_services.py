@@ -53,11 +53,11 @@ def gdrive_service():
 def _serialize_drive_item(item):
     mime_type = item.get('mimeType', '')
     file_name = item.get('name', '')
-    
+                       
     # Clean displayed filename 
     if '(' in file_name:
         file_name = file_name.rsplit('(', 1)[0].strip()
-    
+      
     file_name = re.sub(r'\s*\([^\w\s]{2,}.*\)$', '', file_name)
     parents = item.get('parents', []) or []
     
