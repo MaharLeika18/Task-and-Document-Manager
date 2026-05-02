@@ -916,38 +916,29 @@
 
     async function uploadFiles(event) {
         event.preventDefault();
-        const files = Array.from(fileInput.files || []);
-        if (!files.length) {
-            alert('Select at least one file to upload.');
-            return;
-        }
-
         const projectUid = getSelectedProjectUid();
         const taskName = getSelectedTaskName();
-        statusEl.textContent = 'Uploading files...';
 
-        for (const file of files) {
-            const formData = new FormData();
-            formData.append('file', file);
-            if (currentFolderId) {
-                formData.append('folder_id', currentFolderId);
-            }
-            if (projectUid) {
-                formData.append('project_uid', projectUid);
-            }
-            if (taskName) {
-                formData.append('task_name', taskName);
-            }
+        const files = Array.from(fileInput.files || []);
+        const uploadResult = await window.uploadDriveFiles({
+            files,
+            projectUid,
+            taskName,
+            folderId: currentFolderId || null,
+            endpoint: '/files/api/upload',
+            onStatus: (message) => {
+                statusEl.textContent = message;
+            },
+            onFileStart: ({ index, total }) => {
+                statusEl.textContent = `Uploading file ${index + 1} of ${total}...`;
+            },
+            onFileError: ({ file, data }) => {
+                alert(data?.message || `Upload failed for ${file.name}`);
+            },
+        });
 
-            const response = await fetch('/files/api/upload', {
-                method: 'POST',
-                body: formData,
-            });
-
-            const data = await response.json();
-            if (!data.success) {
-                alert(data.message || `Upload failed for ${file.name}`);
-            }
+        if (!uploadResult.success) {
+            return;
         }
 
         uploadModal.style.display = 'none';

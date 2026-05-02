@@ -36,7 +36,7 @@ def normalize_task_status(status):
         return 'in-review'
     return status
 
-CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.events.owned"]
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 _calendar_validated = False
 _calendar_available = False
@@ -76,7 +76,7 @@ def get_verified_calendar_id(service):
         return None
 
 def create_project_firestore(project_maker, project_name, project_description, assigned_members, 
-                    tasks, status, priority, category, calendar_link, start_date, end_date):
+                    tasks, status, priority, category, calendar_link, calendar_event_id, start_date, end_date):
     from .google_drive_services import create_project_folder
     
     normalized_tasks = []
@@ -112,6 +112,7 @@ def create_project_firestore(project_maker, project_name, project_description, a
         'priority': priority,
         'category': category,
         'calendar_link': calendar_link,
+        'calendar_event_id': calendar_event_id,
         'start_date': start_date,
         'end_date': end_date,
         'drive_folder_id': drive_folder_id,
@@ -124,6 +125,54 @@ def create_project_firestore(project_maker, project_name, project_description, a
         'project_uid': project_uid,
         'drive_folder_id': drive_folder_id
     }
+
+def delete_project_calendar_event(project_data):
+    try:
+        service = gcalendar_service()
+        verified_calendar_id = get_verified_calendar_id(service)
+        if not verified_calendar_id:
+            return False
+
+        event_id = project_data.get('calendar_event_id')
+        if event_id:
+            service.events().delete(calendarId=verified_calendar_id, eventId=event_id).execute()
+            return True
+
+        calendar_link = project_data.get('calendar_link', '') or ''
+        if not calendar_link:
+            return False
+
+        project_name = project_data.get('project_name', '')
+        start_date = project_data.get('start_date', '')
+        end_date = project_data.get('end_date', '')
+        if not project_name or not start_date or not end_date:
+            return False
+
+        start_min = datetime.strptime(start_date, '%Y-%m-%d').isoformat() + 'Z'
+        end_max = (datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=2)).isoformat() + 'Z'
+
+        events_result = service.events().list(
+            calendarId=verified_calendar_id,
+            timeMin=start_min,
+            timeMax=end_max,
+            singleEvents=True,
+            orderBy='startTime',
+            q=project_name,
+            fields='items(id,summary,start,end,description,htmlLink)'
+        ).execute()
+
+        for event in events_result.get('items', []):
+            summary = event.get('summary', '')
+            start = event.get('start', {})
+            event_start = start.get('date', '') or start.get('dateTime', '').split('T')[0]
+            if summary == project_name and event_start == start_date:
+                service.events().delete(calendarId=verified_calendar_id, eventId=event.get('id')).execute()
+                return True
+
+        return False
+    except Exception as error:
+        print(f'Warning: failed to delete Google Calendar project event: {error}')
+        return False
 
 def create_project_gcalendar(project_name, project_description, start_date, end_date):
     """
@@ -159,7 +208,10 @@ def create_project_gcalendar(project_name, project_description, start_date, end_
 
         created_event = service.events().insert(calendarId=verified_calendar_id, body=event).execute()
         print(f'Event created successfully: {created_event.get("htmlLink")}')
-        return created_event.get('htmlLink')
+        return {
+            'htmlLink': created_event.get('htmlLink'),
+            'id': created_event.get('id')
+        }
 
     except HttpError as error:
         print(f'Google Calendar API error: {error}')
@@ -1002,6 +1054,7 @@ def delete_project(project_uid, user_uid):
             if user_uid not in project_data.get('assigned_members', []) and user_uid != project_data.get('project_maker_uid'):
                 return {'success': False, 'message': 'Not authorized to delete this project'}
 
+            delete_project_calendar_event(project_data)
             projects_ref.document(doc.id).delete()
             return {'success': True, 'message': 'Project deleted successfully'}
 

@@ -124,7 +124,24 @@
             <h2>{{ current_year }} College of Computer Studies Projects</h2>
 
             <div class="projects-columns">
-
+                <!-- UPCOMING -->
+                <div class="project-column" id="col-upcoming">
+                    <div class="column-header">PLANNING</div>
+                    {% for project in projects %}
+                        {% if project.status == 'planning' %}
+                            <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
+                                <h4>{{ project.project_name }}</h4>
+                                <div class="project-card-meta">
+                                    <span class="badge">{{ project.status|replace('-', ' ')|capitalize }}</span>
+                                    <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
+                                    <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
+                                </div>
+                                <p>{{ project.project_description }}</p>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                
                 <!-- CURRENT PROJECTS -->
                 <div class="project-column" id="col-current">
                     <div class="column-header">CURRENT PROJECTS</div>
@@ -143,23 +160,7 @@
                     {% endfor %}
                 </div>
 
-                <!-- UPCOMING -->
-                <div class="project-column" id="col-upcoming">
-                    <div class="column-header">PLANNING</div>
-                    {% for project in projects %}
-                        {% if project.status == 'planning' %}
-                            <div class="project-card" data-project-uid="{{ project.project_uid }}" style="cursor: pointer;" onclick="openProject(this)">
-                                <h4>{{ project.project_name }}</h4>
-                                <div class="project-card-meta">
-                                    <span class="badge">{{ project.status|replace('-', ' ')|capitalize }}</span>
-                                    <span class="badge badge-secondary">{{ project.category|replace('_', ' ')|capitalize }}</span>
-                                    <span>{{ project.end_date.split('T')[0] if project.end_date else 'No deadline' }}</span>
-                                </div>
-                                <p>{{ project.project_description }}</p>
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
+                
 
                 <!-- FINISHED -->
                 <div class="project-column" id="col-finished">
@@ -261,7 +262,12 @@
             </div>
 
             <div class="project-card-summary" style="margin-bottom: 1.5rem;">
-                <h3>Project File References</h3>
+                <div class="project-files-header">
+                    <h3>📎 Project Files</h3>
+                    <button type="button" class="btn-upload-files" onclick="openProjectFileUploadModal()" title="Upload files to this project">
+                        ⬆️ Upload Files
+                    </button>
+                </div>
                 <div id="project-files-list"></div>
             </div>
 
@@ -330,6 +336,61 @@
         </div>
     </div>
 </div>
+
+<!-- Project File Upload Modal -->
+<div id="project-file-upload-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Upload Files to Project</h2>
+            <button type="button" class="modal-close" onclick="closeProjectFileUploadModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="file-upload-area" id="file-upload-area">
+                <div class="file-upload-icon">📁</div>
+                <p class="file-upload-text">Drag files here or click to select</p>
+                <input type="file" id="project-file-input" multiple style="display: none;" accept="*/*">
+                <button type="button" class="btn-primary" onclick="document.getElementById('project-file-input').click()">
+                    Choose Files
+                </button>
+            </div>
+            <div id="project-file-upload-list" class="file-upload-list" style="display: none;">
+                <h4>Files to upload:</h4>
+                <ul id="project-file-upload-items"></ul>
+            </div>
+            <div id="project-upload-progress" style="display: none;">
+                <div class="upload-progress-bar">
+                    <div class="upload-progress-fill" id="project-upload-progress-fill"></div>
+                </div>
+                <p id="project-upload-status">Uploading...</p>
+            </div>
+            <div class="modal-footer" id="project-upload-footer">
+                <button type="button" class="btn-secondary" onclick="closeProjectFileUploadModal()">Cancel</button>
+                <button type="button" class="btn-primary" id="project-upload-btn" onclick="uploadProjectFiles()" style="display: none;">
+                    Upload Files
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="project-file-preview-modal" class="modal">
+    <div class="modal-content file-preview-content">
+        <div class="modal-header">
+            <h3 id="project-file-preview-title"></h3>
+            <div class="modal-actions">
+                <a id="project-file-preview-download" class="doc-btn" href="#" title="Download">⬇️</a>
+                <button type="button" id="project-file-preview-close" class="doc-btn" title="Close">✕</button>
+            </div>
+        </div>
+        <div class="modal-body file-preview-body">
+            <iframe id="project-file-preview-iframe" title="File preview" class="file-preview-iframe" style="display: none;"></iframe>
+            <img id="project-file-preview-image" alt="" class="file-preview-image" style="display: none;" />
+            <div id="project-file-preview-fallback" class="empty-state" style="display: none;">Preview not available. Use download instead.</div>
+        </div>
+    </div>
+</div>
+
+
 
 <!-- Projects data + task members data -->
 <script>
@@ -457,9 +518,13 @@
         if (memberCountEl) memberCountEl.textContent = memberSet.size || 0;
     }
 
+    function getProjectCardByUid(projectUid) {
+        return Array.from(document.querySelectorAll('.project-card')).find(card => card.getAttribute('data-project-uid') === projectUid) || null;
+    }
+
     function applyProjectCardDates() {
         PROJECTS_DATA.forEach(project => {
-            const card = document.querySelector(`.project-card[data-project-uid="${project.project_uid}"]`);
+            const card = getProjectCardByUid(project.project_uid);
             if (!card) return;
             const meta = card.querySelector('.project-card-meta');
             const dateSpan = meta ? meta.querySelector('span:last-child') : null;
@@ -825,7 +890,7 @@
                 if (projectIndex >= 0) {
                     PROJECTS_DATA.splice(projectIndex, 1);
                 }
-                const card = document.querySelector(`.project-card[data-project-uid="${projectUid}"]`);
+                const card = getProjectCardByUid(projectUid);
                 if (card) card.remove();
                 closeProject();
                 updateOverviewStats();
@@ -913,21 +978,162 @@
         });
     }
 
+    const projectFileMetadataIndex = new Map();
+
+    function cacheProjectFileMetadata(file) {
+        if (file && file.file_id) {
+            projectFileMetadataIndex.set(file.file_id, file);
+        }
+    }
+
+    function getProjectCachedFile(fileId) {
+        return projectFileMetadataIndex.get(fileId);
+    }
+
+    function projectIconMarkup(iconName) {
+        return `<span class="material-symbols-outlined">${iconName}</span>`;
+    }
+
+    function projectIconForFile(file) {
+        const name = (file.name || '').toLowerCase();
+        const mime = (file.mime_type || '').toLowerCase();
+
+        if (mime.includes('image/')) return projectIconMarkup('image');
+        if (mime.includes('pdf')) return projectIconMarkup('picture_as_pdf');
+        if (mime.includes('spreadsheet') || name.endsWith('.xlsx') || name.endsWith('.xls') || mime.includes('sheet') || mime.includes('ms-excel')) return projectIconMarkup('table_chart');
+        if (mime.includes('wordprocessingml') || mime.includes('word') || mime.includes('document') || name.endsWith('.docx') || name.endsWith('.doc')) return projectIconMarkup('description');
+        if (mime.includes('presentation') || mime.includes('powerpoint') || name.endsWith('.pptx') || name.endsWith('.ppt')) return projectIconMarkup('slideshow');
+        if (mime.includes('text') || name.endsWith('.txt') || name.endsWith('.csv') || name.endsWith('.json')) return projectIconMarkup('article');
+        if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z') || mime.includes('archive') || mime.includes('zip')) return projectIconMarkup('archive');
+        if (mime.includes('text/plain') || name.endsWith('.js') || name.endsWith('.py') || name.endsWith('.java') || name.endsWith('.cpp') || name.endsWith('.html')) return projectIconMarkup('code');
+        if (mime.includes('google-apps')) {
+            if (mime.includes('document')) return projectIconMarkup('description');
+            if (mime.includes('spreadsheet')) return projectIconMarkup('table_chart');
+            if (mime.includes('presentation')) return projectIconMarkup('slideshow');
+            return projectIconMarkup('insert_drive_file');
+        }
+        return projectIconMarkup('insert_drive_file');
+    }
+
+    function projectGetPreviewUrl(file) {
+        const mime = (file.mime_type || '').toLowerCase();
+        if (mime.includes('google-apps')) {
+            return `/files/inline/${file.file_id}?export=pdf`;
+        }
+        return `/files/inline/${file.file_id}`;
+    }
+
+    function openProjectFilePreview(file) {
+        if (!file || !file.file_id) return;
+
+        const previewModal = document.getElementById('project-file-preview-modal');
+        const previewTitle = document.getElementById('project-file-preview-title');
+        const previewDownload = document.getElementById('project-file-preview-download');
+        const previewIframe = document.getElementById('project-file-preview-iframe');
+        const previewImage = document.getElementById('project-file-preview-image');
+        const previewFallback = document.getElementById('project-file-preview-fallback');
+
+        previewTitle.textContent = file.name || 'File preview';
+        previewDownload.href = `/files/download/${file.file_id}`;
+
+        const mime = (file.mime_type || '').toLowerCase();
+        const isImage = mime.startsWith('image/');
+        const previewUrl = projectGetPreviewUrl(file);
+
+        previewIframe.style.display = isImage ? 'none' : 'block';
+        previewImage.style.display = isImage ? 'block' : 'none';
+        previewFallback.style.display = 'none';
+
+        if (isImage) {
+            previewImage.src = previewUrl;
+            previewImage.alt = file.name || 'Preview image';
+        } else {
+            previewIframe.src = previewUrl;
+        }
+
+        previewModal.classList.add('show');
+    }
+
+    function closeProjectFilePreview() {
+        const previewModal = document.getElementById('project-file-preview-modal');
+        const previewIframe = document.getElementById('project-file-preview-iframe');
+        const previewImage = document.getElementById('project-file-preview-image');
+
+        previewModal.classList.remove('show');
+        previewIframe.src = '';
+        previewImage.src = '';
+    }
+
+    function openProjectFileById(fileId) {
+        const file = getProjectCachedFile(fileId);
+        if (file) {
+            openProjectFilePreview(file);
+            return;
+        }
+
+        const params = new URLSearchParams();
+        if (currentProjectUid) {
+            params.set('project_uid', currentProjectUid);
+        }
+        const suffix = params.toString() ? `?${params.toString()}` : '';
+        window.location.href = `/files/view/${fileId}${suffix}`;
+    }
+
     function renderProjectFiles(project) {
         const projectFiles = project.project_files || [];
         const listElement = document.getElementById('project-files-list');
         document.getElementById('project-files-count').textContent = projectFiles.length;
 
+        projectFiles.forEach(cacheProjectFileMetadata);
+
         if (!projectFiles.length) {
-            listElement.innerHTML = '<p class="empty-state">No files linked to this project yet. Use the Files tab to upload and link documents.</p>';
+            listElement.innerHTML = `
+                <div class="files-empty-state">
+                    <p>📂 No files uploaded yet</p>
+                    <small>Upload files using the button above to attach them to this project</small>
+                </div>
+            `;
             return;
         }
 
-        listElement.innerHTML = projectFiles.map(file => {
-            const href = file.web_view_link || `/files/view/${file.file_id}`;
-            return `<p><a href="${href}" target="_blank">${file.name}</a></p>`;
-        }).join('');
+        listElement.innerHTML = `
+            <div class="project-files-grid">
+                ${projectFiles.map(file => {
+                    const fileIcon = projectIconForFile(file);
+                    const fileName = file.name || 'Untitled file';
+                    const fileExt = (fileName.split('.').pop() || 'file').toUpperCase();
+                    return `
+                        <div class="project-file-item" data-view-file-id="${file.file_id}" role="button" tabindex="0">
+                            <div class="file-icon">${fileIcon}</div>
+                            <div class="file-info">
+                                <span class="file-name" title="${fileName}">${fileName}</span>
+                                <small class="file-ext">.${fileExt}</small>
+                            </div>
+                            <div class="file-actions">
+                                <button type="button" class="file-link-btn" data-view-file-id="${file.file_id}" title="View file">👁️ View</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
     }
+
+    function getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const icons = {
+            'pdf': '📄',
+            'doc': '📝', 'docx': '📝', 'txt': '📝',
+            'xls': '📊', 'xlsx': '📊', 'csv': '📊',
+            'ppt': '🎯', 'pptx': '🎯',
+            'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
+            'zip': '🗂️', 'rar': '🗂️', '7z': '🗂️',
+            'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬',
+            'mp3': '🎵', 'wav': '🎵', 'flac': '🎵'
+        };
+        return icons[ext] || '📎';
+    }
+
 
     function renderTaskCard(task, project) {
         const card = document.createElement('div');
@@ -1093,7 +1299,7 @@
     }
 
     function syncProjectCard(project) {
-        const card = document.querySelector(`.project-card[data-project-uid="${project.project_uid}"]`);
+        const card = getProjectCardByUid(project.project_uid);
         if (!card) return;
 
         const nameEl = card.querySelector('h4');
@@ -1144,6 +1350,40 @@
         } catch (error) {
             console.error('Error refreshing tasks:', error);
             showStatusNotification('Unable to refresh tasks', 'error');
+        }
+    }
+
+    async function refreshProjectWithFiles() {
+        if (!currentProjectUid) return;
+        try {
+            const response = await fetch(`/projects/get_project_data/${encodeURIComponent(currentProjectUid)}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            if (!data.success) {
+                showStatusNotification(data.message || 'Unable to refresh project', 'error');
+                return;
+            }
+
+            // Update current project with new data including files
+            const updatedProject = data.project;
+            currentProject = {
+                ...currentProject,
+                ...updatedProject
+            };
+            
+            // Also update in PROJECTS_DATA
+            const projectIndex = PROJECTS_DATA.findIndex(p => p.project_uid === currentProjectUid);
+            if (projectIndex >= 0) {
+                PROJECTS_DATA[projectIndex] = currentProject;
+            }
+            
+            renderCurrentProjectView();
+            updateOverviewStats();
+        } catch (error) {
+            console.error('Error refreshing project data:', error);
+            showStatusNotification('Unable to refresh project data', 'error');
         }
     }
 
@@ -1216,7 +1456,7 @@
 
     const initialProjectUid = new URLSearchParams(window.location.search).get('project_uid');
     if (initialProjectUid) {
-        const initialCard = document.querySelector(`.project-card[data-project-uid="${initialProjectUid}"]`);
+        const initialCard = getProjectCardByUid(initialProjectUid);
         if (initialCard) {
             openProject(initialCard);
         }
@@ -1691,6 +1931,200 @@
     }
 
     // Task rendering already rebinds interactions after updates.
+
+    // Project File Upload Functions
+    let projectFilesForUpload = [];
+
+    function openProjectFileUploadModal() {
+        if (!currentProjectUid) {
+            showStatusNotification('Please select a project first', 'error');
+            return;
+        }
+        projectFilesForUpload = [];
+        const modal = document.getElementById('project-file-upload-modal');
+        modal.classList.add('show');
+        document.getElementById('project-file-input').value = '';
+        document.getElementById('project-file-upload-list').style.display = 'none';
+        document.getElementById('project-upload-progress').style.display = 'none';
+        document.getElementById('project-upload-btn').style.display = 'none';
+        document.getElementById('project-upload-footer').style.display = 'flex';
+        document.querySelector('.file-upload-area').style.display = 'flex';
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', closeOnBackdropClick);
+    }
+
+    function closeProjectFileUploadModal() {
+        const modal = document.getElementById('project-file-upload-modal');
+        modal.classList.remove('show');
+        projectFilesForUpload = [];
+        modal.removeEventListener('click', closeOnBackdropClick);
+    }
+
+    function closeOnBackdropClick(e) {
+        if (e.target.id === 'project-file-upload-modal') {
+            closeProjectFileUploadModal();
+        }
+    }
+
+    function setupFileUploadDragDrop() {
+        const uploadArea = document.getElementById('file-upload-area');
+        const fileInput = document.getElementById('project-file-input');
+
+        if (!uploadArea || !fileInput) {
+            console.warn('File upload elements not found');
+            return;
+        }
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop area when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.remove('dragover');
+            }, false);
+        });
+
+        // Handle dropped files
+        uploadArea.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            addFilesToUploadList(Array.from(files));
+        }, false);
+
+        // Handle file input change
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            addFilesToUploadList(Array.from(files));
+        }, false);
+
+        // Click to select files
+        uploadArea.addEventListener('click', () => fileInput.click(), false);
+    }
+
+    function addFilesToUploadList(files) {
+        projectFilesForUpload = files;
+        const listContainer = document.getElementById('project-file-upload-list');
+        const itemsList = document.getElementById('project-file-upload-items');
+        const uploadBtn = document.getElementById('project-upload-btn');
+        const uploadArea = document.querySelector('.file-upload-area');
+
+        if (files.length === 0) {
+            listContainer.style.display = 'none';
+            uploadBtn.style.display = 'none';
+            uploadArea.style.display = 'flex';
+            return;
+        }
+
+        itemsList.innerHTML = files.map((file, index) => {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            return `<li>
+                <span>${file.name}</span>
+                <span class="file-size">${sizeMB} MB</span>
+            </li>`;
+        }).join('');
+
+        listContainer.style.display = 'block';
+        uploadBtn.style.display = 'block';
+        uploadArea.style.display = 'none';
+    }
+
+    function uploadProjectFiles() {
+        if (!currentProjectUid || projectFilesForUpload.length === 0) {
+            showStatusNotification('No files selected', 'error');
+            return;
+        }
+
+        const progressDiv = document.getElementById('project-upload-progress');
+        const progressFill = document.getElementById('project-upload-progress-fill');
+        const statusText = document.getElementById('project-upload-status');
+        const uploadBtn = document.getElementById('project-upload-btn');
+        const uploadFooter = document.getElementById('project-upload-footer');
+
+        progressDiv.style.display = 'block';
+        uploadBtn.disabled = true;
+        uploadFooter.style.display = 'none';
+        document.querySelector('.file-upload-area').style.display = 'none';
+        document.getElementById('project-file-upload-list').style.display = 'none';
+
+        window.uploadDriveFiles({
+            files: projectFilesForUpload,
+            projectUid: currentProjectUid,
+            endpoint: '/files/api/upload',
+            onStatus: (message) => {
+                statusText.textContent = message;
+            },
+            onFileStart: ({ index, total }) => {
+                statusText.textContent = `Uploading file ${index + 1} of ${total}...`;
+            },
+            onFileSuccess: ({ index, total }) => {
+                const progress = Math.round(((index + 1) / total) * 100);
+                progressFill.style.width = progress + '%';
+            },
+            onFileError: ({ file }) => {
+                showStatusNotification(`Error uploading ${file.name}`, 'error');
+            },
+            onComplete: ({ allSucceeded }) => {
+                if (allSucceeded) {
+                    setTimeout(() => {
+                        showStatusNotification('Files uploaded successfully!', 'success');
+                        closeProjectFileUploadModal();
+                        refreshProjectWithFiles();
+                    }, 400);
+                    return;
+                }
+
+                uploadBtn.disabled = false;
+                uploadFooter.style.display = 'flex';
+                progressDiv.style.display = 'none';
+                document.querySelector('.file-upload-area').style.display = 'flex';
+            }
+        });
+    }
+
+    // Initialize file upload when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        setupFileUploadDragDrop();
+
+        const projectFilesList = document.getElementById('project-files-list');
+        const previewModal = document.getElementById('project-file-preview-modal');
+
+        projectFilesList?.addEventListener('click', event => {
+            const trigger = event.target.closest('[data-view-file-id]');
+            if (!trigger) return;
+            event.preventDefault();
+            openProjectFileById(trigger.getAttribute('data-view-file-id'));
+        });
+
+        projectFilesList?.addEventListener('keydown', event => {
+            const target = event.target.closest('.project-file-item[data-view-file-id]');
+            if (!target) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            openProjectFileById(target.getAttribute('data-view-file-id'));
+        });
+
+        document.getElementById('project-file-preview-close')?.addEventListener('click', closeProjectFilePreview);
+        previewModal?.addEventListener('click', event => {
+            if (event.target === previewModal) {
+                closeProjectFilePreview();
+            }
+        });
+    });
 </script>
 
 <!-- Status Menu Styles -->
@@ -1944,6 +2378,336 @@
 
     .status-history-item strong {
         color: #111827;
+    }
+
+    /* Project File Upload Styles */
+    .project-files-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .project-files-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        color: #333;
+    }
+
+    .btn-upload-files {
+        padding: 0.5rem 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.3s;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    }
+
+    .btn-upload-files:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-upload-files:active {
+        transform: translateY(0);
+    }
+
+    #project-file-upload-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1100;
+    }
+
+    #project-file-upload-modal.show {
+        display: flex !important;
+    }
+
+    #project-file-upload-modal .modal-content {
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        margin: 0;
+    }
+
+    #project-file-preview-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.55);
+        z-index: 1200;
+    }
+
+    #project-file-preview-modal.show {
+        display: flex !important;
+    }
+
+    #project-file-preview-modal .file-preview-content {
+        width: min(920px, 92vw);
+        max-height: 86vh;
+        margin: 0;
+        overflow: hidden;
+    }
+
+    #project-file-preview-modal .file-preview-body {
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        min-height: 60vh;
+        padding: 0;
+        background: #f8fafc;
+    }
+
+    #project-file-preview-modal .file-preview-iframe {
+        width: 100%;
+        min-height: 70vh;
+        border: 0;
+        background: white;
+    }
+
+    #project-file-preview-modal .file-preview-image {
+        max-width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+        margin: auto;
+        display: block;
+    }
+
+    .file-upload-area {
+        border: 2px dashed #667eea;
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        background: #f8f9ff;
+        cursor: pointer;
+        transition: all 0.3s;
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .file-upload-area:hover {
+        border-color: #764ba2;
+        background: #f0f4ff;
+    }
+
+    .file-upload-area.dragover {
+        border-color: #764ba2;
+        background: #e8f0ff;
+        transform: scale(1.02);
+    }
+
+    .file-upload-icon {
+        font-size: 3rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .file-upload-text {
+        font-size: 1rem;
+        color: #667eea;
+        font-weight: 500;
+        margin-bottom: 1rem;
+    }
+
+    .file-upload-list {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: #f9fafb;
+        border-radius: 8px;
+    }
+
+    .file-upload-list h4 {
+        margin: 0 0 0.75rem 0;
+        color: #333;
+        font-size: 0.95rem;
+    }
+
+    .file-upload-list ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .file-upload-list li {
+        padding: 0.5rem 0.75rem;
+        background: white;
+        margin-bottom: 0.5rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        color: #333;
+        border-left: 3px solid #667eea;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .file-upload-list li .file-size {
+        font-size: 0.85rem;
+        color: #999;
+    }
+
+    #project-upload-progress {
+        margin-top: 1.5rem;
+    }
+
+    .upload-progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+    }
+
+    .upload-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        width: 0%;
+        transition: width 0.3s ease;
+        border-radius: 999px;
+    }
+
+    #project-upload-status {
+        font-size: 0.9rem;
+        color: #667eea;
+        margin: 0;
+        text-align: center;
+    }
+
+    .modal-footer {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    /* Project Files Grid Styles */
+    .project-files-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .project-file-item {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        transition: all 0.3s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .project-file-item:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        border-color: #667eea;
+    }
+
+    .file-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .file-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        flex: 1;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .file-name {
+        color: #333;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.9rem;
+        word-break: break-word;
+        hyphens: auto;
+        transition: color 0.3s;
+        display: -webkit-box;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .file-name:hover {
+        color: #667eea;
+        text-decoration: underline;
+    }
+
+    .file-ext {
+        color: #999;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+
+    .file-actions {
+        margin-top: 0.75rem;
+        width: 100%;
+    }
+
+    .file-link-btn {
+        display: inline-block;
+        padding: 0.4rem 0.8rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        transition: all 0.3s;
+        border: none;
+        cursor: pointer;
+    }
+
+    .file-link-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .files-empty-state {
+        text-align: center;
+        padding: 2rem 1rem;
+        color: #999;
+        background: #f9fafb;
+        border-radius: 8px;
+        border: 1px dashed #e5e7eb;
+    }
+
+    .files-empty-state p {
+        margin: 0 0 0.5rem 0;
+        font-size: 1rem;
+        color: #333;
+    }
+
+    .files-empty-state small {
+        display: block;
+        font-size: 0.85rem;
+        color: #999;
     }
 </style>
 

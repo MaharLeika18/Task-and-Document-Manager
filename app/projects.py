@@ -21,7 +21,7 @@ def projects():
         "picture": session["picture"],
         "current_session_id": session["current_session_id"]
     }
-    members = get_users()
+    members = [member for member in get_users() if member.get('uid') != user['uid']]
     projects = get_projects_for_user(user['uid'])
     for project in projects:
         project['tasks'] = get_tasks_for_project_user(project['project_uid'], user['uid'])
@@ -38,6 +38,7 @@ def create_project():
             "picture": session["picture"],
             "current_session_id": session["current_session_id"]
         }
+        members = [member for member in get_users() if member.get('uid') != user['uid']]
         project_name = (request.form.get('project-name') or '').strip()
         project_description = (request.form.get('project-description') or '').strip()
         assign_members = request.form.getlist('members')
@@ -54,7 +55,7 @@ def create_project():
             return render_template(
                 "projects.html",
                 user=user,
-                members=get_users(),
+                members=members,
                 projects=projects,
                 error="Project name and deadline are required."
             )
@@ -76,7 +77,7 @@ def create_project():
             return render_template(
                 "projects.html",
                 user=user,
-                members=get_users(),
+                members=members,
                 projects=projects,
                 error="Invalid deadline format. Please select a valid date."
             )
@@ -95,17 +96,17 @@ def create_project():
             })
             i += 1
 
-        calendar_link = create_project_gcalendar(project_name, project_description, start_date, end_date)
-        if calendar_link is None:
+        calendar_event = create_project_gcalendar(project_name, project_description, start_date, end_date)
+        if not calendar_event:
             print("Warning: Failed to create Google Calendar event, proceeding without calendar link")
-            calendar_link = ""
+            calendar_event = {"htmlLink": "", "id": ""}
 
         print("DATA:", project_name, assign_members, deadline)
         try:
             result = create_project_firestore(
                 user, project_name, project_description, assign_members,
                 tasks, project_status, project_priority, project_category,
-                calendar_link, start_date, end_date
+                calendar_event.get('htmlLink', ''), calendar_event.get('id', ''), start_date, end_date
             )
             print("Project created successfully:", result)
         except Exception as e:
@@ -116,7 +117,7 @@ def create_project():
                 project['tasks'] = get_tasks_for_project_user(project['project_uid'], user['uid'])
             return render_template("projects.html", 
                 user=user, 
-                members=get_users(), 
+                members=members, 
                 projects=projects, 
                 error="Failed to create project. Please try again."
             )
@@ -292,6 +293,24 @@ def get_project_tasks(project_uid):
     user_uid = session['uid']
     tasks = get_tasks_for_project_user(project_uid, user_uid)
     return jsonify({'success': True, 'tasks': tasks})
+
+@projects_bp.route('/get_project_data/<path:project_uid>', methods=['GET'])
+@auth_required
+def get_project_data(project_uid):
+    """Get complete project data including files and tasks"""
+    user_uid = session['uid']
+    doc_id, project_data = get_project_by_uid(project_uid)
+    
+    if not project_data:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    if user_uid not in project_data.get('assigned_members', []):
+        return jsonify({'success': False, 'message': 'Not authorized'}), 403
+    
+    # Add tasks to project data
+    project_data['tasks'] = get_tasks_for_project_user(project_uid, user_uid)
+    
+    return jsonify({'success': True, 'project': project_data})
 
 @projects_bp.route('/api/status_info', methods=['GET'])
 @auth_required
