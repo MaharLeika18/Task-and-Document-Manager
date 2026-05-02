@@ -239,11 +239,13 @@ function initGlobalSearch() {
                 nextParams.set('q', query);
             }
             const nextUrl = `/projects?${nextParams.toString()}`.replace(/\?$/, '');
+            searchInput.value = '';
             window.location.href = nextUrl;
             return;
         }
 
         applyGlobalSearch(query);
+        searchInput.value = '';
     });
 }
 
