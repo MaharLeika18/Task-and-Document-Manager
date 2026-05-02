@@ -239,11 +239,13 @@ function initGlobalSearch() {
                 nextParams.set('q', query);
             }
             const nextUrl = `/projects?${nextParams.toString()}`.replace(/\?$/, '');
+            searchInput.value = '';
             window.location.href = nextUrl;
             return;
         }
 
         applyGlobalSearch(query);
+        searchInput.value = '';
     });
 }
 
@@ -273,12 +275,20 @@ function applyGlobalSearch(query) {
         });
     }
 
-    // Members view
-    document.querySelectorAll('.member-card').forEach(card => {
-        const name = card.querySelector('h3')?.textContent.toLowerCase() || '';
-        const meta = card.textContent.toLowerCase();
-        card.style.display = (name.includes(normalizedQuery) || meta.includes(normalizedQuery)) ? '' : 'none';
-    });
+    // Members view - only apply search if there's an active query and we're on the members page
+    const hasMemberCards = document.querySelector('.members-grid') || document.querySelector('.member-card');
+    if (hasMemberCards && normalizedQuery) {
+        document.querySelectorAll('.member-card').forEach(card => {
+            const name = card.querySelector('h3')?.textContent.toLowerCase() || '';
+            const meta = card.textContent.toLowerCase();
+            card.style.display = (name.includes(normalizedQuery) || meta.includes(normalizedQuery)) ? '' : 'none';
+        });
+    } else if (hasMemberCards) {
+        // Show all members when no search query
+        document.querySelectorAll('.member-card').forEach(card => {
+            card.style.display = '';
+        });
+    }
 
     // Files view
     const fileSearch = document.getElementById('file-search');

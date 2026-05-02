@@ -83,6 +83,8 @@ def create_project_firestore(project_maker, project_name, project_description, a
     for task in tasks:
         normalized_task = dict(task)
         normalized_task.setdefault('files', [])
+        normalized_task.setdefault('event_link', '')
+        normalized_task.setdefault('event_id', '')
         normalized_tasks.append(normalized_task)
 
     # Generate project UID first
@@ -118,6 +120,19 @@ def create_project_firestore(project_maker, project_name, project_description, a
         'drive_folder_id': drive_folder_id,
         'drive_folder_link': drive_folder_link
     })
+    
+    # Create calendar events for each task
+    project_ref = db.collection('projects').document(project[1].id)
+    for idx, task in enumerate(normalized_tasks):
+        task_due_date = task.get('due_date') or end_date
+        if task_due_date and not task.get('event_id'):
+            event_data = create_task_gcalendar(task.get('name', ''), project_name, task_due_date, project_description)
+            if event_data:
+                normalized_tasks[idx]['event_link'] = event_data.get('htmlLink', '')
+                normalized_tasks[idx]['event_id'] = event_data.get('id', '')
+    
+    # Update project with task calendar event IDs
+    project_ref.update({'tasks': normalized_tasks})
     
     return {
         'success': True,

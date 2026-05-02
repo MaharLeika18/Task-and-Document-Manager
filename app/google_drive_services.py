@@ -57,7 +57,7 @@ def _serialize_drive_item(item):
     # Clean displayed filename 
     if '(' in file_name:
         file_name = file_name.rsplit('(', 1)[0].strip()
-
+    
     file_name = re.sub(r'\s*\([^\w\s]{2,}.*\)$', '', file_name)
     parents = item.get('parents', []) or []
     
