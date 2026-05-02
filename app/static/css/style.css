@@ -135,8 +135,8 @@ body::after {
     background: rgba(3, 37, 140, 0.55);
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-    padding: 0.75rem 1.5rem;
+    border-bottom: .5px solid rgba(255, 255, 255, 0.18);
+    padding: 0.5em 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -146,7 +146,7 @@ body::after {
     left: 0;
     right: 0;
     z-index: 1000;
-    gap: 1rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
 }
 
@@ -191,6 +191,7 @@ body::after {
 .search-bar form:focus-within {
     background: rgba(255, 255, 255, 0.28);
     border-color: rgba(255, 255, 255, 0.55);
+        border-radius: var(--radius-pill);
     box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 0 0 3px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.3);
 }
 
@@ -203,11 +204,12 @@ body::after {
     font-family: 'Montserrat', sans-serif;
     font-weight: 500;
     background: transparent;
-    color: white;
+    opacity: 30%;
+
+    border-radius: var(--radius-pill);
 }
 
 .search-bar input::placeholder {
-    color: rgba(255, 255, 255, 0.55);
     font-style: italic;
     font-weight: 400;
 }
