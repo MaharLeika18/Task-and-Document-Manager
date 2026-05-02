@@ -1731,7 +1731,7 @@ body {
 }
 
 .auth-container {
-    max-width: 400px;
+    max-width: 50rem;
     margin: 5rem auto;
     padding: 2rem;
     background: white;
